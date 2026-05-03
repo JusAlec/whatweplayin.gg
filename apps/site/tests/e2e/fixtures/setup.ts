@@ -81,7 +81,11 @@ const PEOPLE = ['alec', 'mike', 'sarah'];
  */
 function seedWorkerKv(): void {
   const wranglerBin = resolve(workerDir, 'node_modules/.bin/wrangler');
-  const base = `"${wranglerBin}" kv key put --namespace-id PLACEHOLDER_REPLACE_ON_DEPLOY --local --persist-to .wrangler/state-test`;
+  // Use --binding=KV (resolves the namespace ID from wrangler.toml) so this
+  // fixture stays correct regardless of which real KV ID is configured for
+  // production. --local forces wrangler to write to the on-disk persistence
+  // dir instead of the live Cloudflare API.
+  const base = `"${wranglerBin}" kv key put --binding=KV --local --persist-to .wrangler/state-test`;
   const opts = { cwd: workerDir, stdio: 'inherit' as const };
 
   // Auth secret
