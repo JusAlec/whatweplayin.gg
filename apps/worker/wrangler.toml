@@ -5,8 +5,8 @@ compatibility_flags = ["nodejs_compat"]
 
 [[kv_namespaces]]
 binding = "KV"
-id = "PLACEHOLDER_REPLACE_ON_DEPLOY"
-preview_id = "PLACEHOLDER_REPLACE_ON_DEPLOY"
+id = "18dbad46911b4c628702b8e47d41b5f1"
+preview_id = "43e751f40669435aacac776316358cd5"
 
 [observability]
 enabled = true
