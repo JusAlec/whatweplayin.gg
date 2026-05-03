@@ -3,9 +3,11 @@
 Decide which survival game to play tonight, fast.
 
 ## Stack
+
 Astro + React + Tailwind | Cloudflare Workers + KV + Pages | pnpm workspaces
 
 ## Setup
+
 ```
 nvm use
 corepack enable
