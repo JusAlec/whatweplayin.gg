@@ -1,0 +1,77 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.4
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate catalog
+        run: pnpm validate:catalog
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Unit tests (recommender)
+        run: pnpm --filter @gno/recommender test
+
+      - name: Unit tests (scripts)
+        run: pnpm --filter @gno/scripts test
+
+      - name: Worker tests (miniflare)
+        run: pnpm --filter @gno/worker test
+
+      - name: Site build
+        run: pnpm --filter @gno/site build
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @gno/site exec playwright install --with-deps chromium
+
+      - name: E2E
+        run: pnpm --filter @gno/site test:e2e
+        env:
+          PUBLIC_WORKER_URL: http://localhost:8787
+
+  deploy-worker:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.4
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm --filter @gno/worker deploy
