@@ -1,0 +1,8 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PeopleList from '../../components/PeopleList.tsx';
+---
+<Layout title="People" activeTab="people">
+  <h1 class="text-2xl font-semibold mb-4">People</h1>
+  <PeopleList client:only="react" />
+</Layout>
