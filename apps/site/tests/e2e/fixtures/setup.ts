@@ -84,8 +84,9 @@ function seedWorkerKv(): void {
   // Use --binding=KV (resolves the namespace ID from wrangler.toml) so this
   // fixture stays correct regardless of which real KV ID is configured for
   // production. --local forces wrangler to write to the on-disk persistence
-  // dir instead of the live Cloudflare API.
-  const base = `"${wranglerBin}" kv key put --binding=KV --local --persist-to .wrangler/state-test`;
+  // dir instead of the live Cloudflare API. --preview selects the preview
+  // namespace, which is also what `wrangler dev` reads from by default.
+  const base = `"${wranglerBin}" kv key put --binding=KV --local --preview --persist-to .wrangler/state-test`;
   const opts = { cwd: workerDir, stdio: 'inherit' as const };
 
   // Auth secret
