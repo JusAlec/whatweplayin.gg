@@ -2,6 +2,7 @@ import { checkAuth } from './auth.js';
 import { dispatchKvCrud } from './routes/kv-crud.js';
 import { dispatchVotes } from './routes/votes.js';
 import { dispatchSessions } from './routes/sessions.js';
+import { dispatchState } from './routes/state.js';
 
 export interface Env {
   KV: KVNamespace;
@@ -27,6 +28,8 @@ export default {
 
       const inner = parts.slice(2);
       const innerCtx = { request, env, groupId, parts: inner };
+      const stateResp = await dispatchState(innerCtx);
+      if (stateResp) return withCors(stateResp);
       const voteResp = await dispatchVotes(innerCtx);
       if (voteResp) return withCors(voteResp);
       const sessionResp = await dispatchSessions(innerCtx);
