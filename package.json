@@ -1,0 +1,25 @@
+{
+  "name": "gamenight-os",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "pnpm -r test",
+    "test:unit": "pnpm --filter @gno/recommender test",
+    "test:worker": "pnpm --filter @gno/worker test",
+    "test:e2e": "pnpm --filter @gno/site test:e2e",
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter @gno/site dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "validate:catalog": "tsx scripts/validate-catalog.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20"
+  }
+}
