@@ -1,0 +1,7 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import SessionSetup from '../../components/SessionSetup.tsx';
+---
+<Layout title="Tonight" activeTab="tonight">
+  <SessionSetup client:only="react" />
+</Layout>
