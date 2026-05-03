@@ -1,0 +1,98 @@
+[
+  {
+    "id": "alec",
+    "displayName": "alec",
+    "stablePrefs": {
+      "combat": 3,
+      "grind": 3,
+      "buildingDepth": 3,
+      "commitmentLevel": 3,
+      "pvpFocus": 3,
+      "sessionLength": 3
+    }
+  },
+  {
+    "id": "justin",
+    "displayName": "justin",
+    "stablePrefs": {
+      "combat": 3,
+      "grind": 3,
+      "buildingDepth": 3,
+      "commitmentLevel": 3,
+      "pvpFocus": 3,
+      "sessionLength": 3
+    }
+  },
+  {
+    "id": "matt",
+    "displayName": "matt",
+    "stablePrefs": {
+      "combat": 3,
+      "grind": 3,
+      "buildingDepth": 3,
+      "commitmentLevel": 3,
+      "pvpFocus": 3,
+      "sessionLength": 3
+    }
+  },
+  {
+    "id": "ramien",
+    "displayName": "ramien",
+    "stablePrefs": {
+      "combat": 3,
+      "grind": 3,
+      "buildingDepth": 3,
+      "commitmentLevel": 3,
+      "pvpFocus": 3,
+      "sessionLength": 3
+    }
+  },
+  {
+    "id": "ashley",
+    "displayName": "ashley",
+    "stablePrefs": {
+      "combat": 3,
+      "grind": 3,
+      "buildingDepth": 3,
+      "commitmentLevel": 3,
+      "pvpFocus": 3,
+      "sessionLength": 3
+    }
+  },
+  {
+    "id": "mike",
+    "displayName": "mike",
+    "stablePrefs": {
+      "combat": 3,
+      "grind": 3,
+      "buildingDepth": 3,
+      "commitmentLevel": 3,
+      "pvpFocus": 3,
+      "sessionLength": 3
+    }
+  },
+  {
+    "id": "j0ey",
+    "displayName": "j0ey",
+    "stablePrefs": {
+      "combat": 3,
+      "grind": 3,
+      "buildingDepth": 3,
+      "commitmentLevel": 3,
+      "pvpFocus": 3,
+      "sessionLength": 3
+    }
+  },
+  {
+    "id": "chandini",
+    "displayName": "chandini",
+    "stablePrefs": {
+      "combat": 3,
+      "grind": 3,
+      "buildingDepth": 3,
+      "commitmentLevel": 3,
+      "pvpFocus": 3,
+      "sessionLength": 3
+    }
+  }
+]

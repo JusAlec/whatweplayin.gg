@@ -1,0 +1,11 @@
+{
+  "id": "rivals",
+  "displayName": "RIVALS",
+  "scoringWeights": {
+    "preferenceMatch": 0.4,
+    "groupFit": 0.25,
+    "sessionFit": 0.2,
+    "novelty": 0.15
+  },
+  "secretHash": "4d395c5baedccb79cd979e2eac56a15b03594712d2be75e0260bead8ee6110c6"
+}
