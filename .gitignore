@@ -11,3 +11,7 @@ playwright-report/
 test-results/
 coverage/
 *.tsbuildinfo
+
+# Build-time data copies (generated from data/ at config load)
+apps/site/public/data/games.json
+apps/site/public/data/groups/
