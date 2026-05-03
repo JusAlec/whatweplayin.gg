@@ -13,7 +13,8 @@
     "lint": "eslint . --ext .ts,.tsx && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "pnpm -r typecheck",
-    "validate:catalog": "tsx scripts/validate-catalog.ts"
+    "validate:catalog": "tsx scripts/validate-catalog.ts",
+    "bootstrap-group": "tsx scripts/bootstrap-group.ts"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^6.21.0",
