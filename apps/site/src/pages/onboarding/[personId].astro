@@ -1,0 +1,26 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import OnboardingWizard from '../../components/OnboardingWizard.tsx';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+export async function getStaticPaths() {
+  const dataRoot = fileURLToPath(new URL('../../../../../data/groups/', import.meta.url));
+  if (!existsSync(dataRoot)) return [];
+  const groups = readdirSync(dataRoot);
+  const ids = new Set<string>();
+  for (const g of groups) {
+    try {
+      const file = `${dataRoot}${g}/people.json`;
+      const people = JSON.parse(readFileSync(file, 'utf8')) as Array<{ id: string }>;
+      for (const p of people) ids.add(p.id);
+    } catch { /* skip */ }
+  }
+  return [...ids].map((id) => ({ params: { personId: id } }));
+}
+
+const { personId } = Astro.params;
+---
+<Layout title="Onboarding" activeTab="people">
+  <OnboardingWizard personId={personId!} client:only="react" />
+</Layout>
