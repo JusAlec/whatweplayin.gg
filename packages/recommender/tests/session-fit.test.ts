@@ -3,9 +3,17 @@ import { sessionFit, SESSION_LENGTH_MINS } from '../src/session-fit.js';
 import type { Game, RatingCache } from '../src/types.js';
 
 const game: Game = {
-  id: 'g', name: 'g', minPlayers: 1, maxPlayers: 4,
-  optimalPlayers: { min: 1, max: 4 }, hostingModel: 'p2p', releaseStatus: 'released',
-  hasSinglePlayer: true, hasCoop: true, hasPvP: false, genre: ['survival'],
+  id: 'g',
+  name: 'g',
+  minPlayers: 1,
+  maxPlayers: 4,
+  optimalPlayers: { min: 1, max: 4 },
+  hostingModel: 'p2p',
+  releaseStatus: 'released',
+  hasSinglePlayer: true,
+  hasCoop: true,
+  hasPvP: false,
+  genre: ['survival'],
 };
 
 const cacheFor = (sessionLength: number): RatingCache => ({

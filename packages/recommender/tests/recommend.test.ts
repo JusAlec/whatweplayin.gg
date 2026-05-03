@@ -1,22 +1,46 @@
 import { test, expect, describe } from 'vitest';
 import { recommend } from '../src/recommend.js';
-import type { Game, Person, RatingCache, RecommendationContext, GroupSettings } from '../src/types.js';
+import type {
+  Game,
+  Person,
+  RatingCache,
+  RecommendationContext,
+  GroupSettings,
+} from '../src/types.js';
 
 const groupSettings: GroupSettings = {
-  id: 'g1', displayName: 'g', secretHash: 'x',
+  id: 'g1',
+  displayName: 'g',
+  secretHash: 'x',
   scoringWeights: { preferenceMatch: 0.4, groupFit: 0.25, sessionFit: 0.2, novelty: 0.15 },
 };
 
 const game = (id: string, over: Partial<Game> = {}): Game => ({
-  id, name: id, minPlayers: 1, maxPlayers: 4, optimalPlayers: { min: 2, max: 4 },
-  hostingModel: 'p2p', releaseStatus: 'released',
-  hasSinglePlayer: true, hasCoop: true, hasPvP: false, genre: ['survival'],
+  id,
+  name: id,
+  minPlayers: 1,
+  maxPlayers: 4,
+  optimalPlayers: { min: 2, max: 4 },
+  hostingModel: 'p2p',
+  releaseStatus: 'released',
+  hasSinglePlayer: true,
+  hasCoop: true,
+  hasPvP: false,
+  genre: ['survival'],
   ...over,
 });
 
 const person = (id: string, n: number): Person => ({
-  id, displayName: id,
-  stablePrefs: { combat: n, grind: n, buildingDepth: n, commitmentLevel: n, pvpFocus: n, sessionLength: n },
+  id,
+  displayName: id,
+  stablePrefs: {
+    combat: n,
+    grind: n,
+    buildingDepth: n,
+    commitmentLevel: n,
+    pvpFocus: n,
+    sessionLength: n,
+  },
 });
 
 const allRated = (avg: number): RatingCache => ({
@@ -50,9 +74,7 @@ describe('recommend', () => {
 
   test('caps picks at 3 and alsoConsidered at 5', () => {
     const games = Array.from({ length: 12 }, (_, i) => game(`g${i}`));
-    const owns = Object.fromEntries(
-      games.map((g) => [g.id, true]),
-    );
+    const owns = Object.fromEntries(games.map((g) => [g.id, true]));
     const c = ctx({
       owns: { alec: owns, mike: owns },
       ratingCacheGroup: Object.fromEntries(games.map((g) => [g.id, allRated(3)])),

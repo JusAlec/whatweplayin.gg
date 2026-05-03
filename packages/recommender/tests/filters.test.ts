@@ -20,7 +20,14 @@ const game = (over: Partial<Game> = {}): Game => ({
 const person = (id: string): Person => ({
   id,
   displayName: id,
-  stablePrefs: { combat: 3, grind: 3, buildingDepth: 3, commitmentLevel: 3, pvpFocus: 3, sessionLength: 3 },
+  stablePrefs: {
+    combat: 3,
+    grind: 3,
+    buildingDepth: 3,
+    commitmentLevel: 3,
+    pvpFocus: 3,
+    sessionLength: 3,
+  },
 });
 
 const owns = (entries: Record<string, string[]>): OwnsLookup => {
@@ -48,7 +55,9 @@ describe('passesFilter', () => {
   test('fails when attendee count above maxPlayers', () => {
     const g = game({ minPlayers: 1, maxPlayers: 2 });
     const a = [person('alec'), person('mike'), person('sarah')];
-    expect(passesFilter(g, a, owns({ alec: ['valheim'], mike: ['valheim'], sarah: ['valheim'] }))).toBe(false);
+    expect(
+      passesFilter(g, a, owns({ alec: ['valheim'], mike: ['valheim'], sarah: ['valheim'] })),
+    ).toBe(false);
   });
 
   test('fails when one attendee does not own the game', () => {
@@ -68,7 +77,9 @@ describe('explainExclusion', () => {
   test('explains player count below min', () => {
     const g = game({ minPlayers: 4, maxPlayers: 10 });
     const a = [person('alec')];
-    expect(explainExclusion(g, a, owns({ alec: ['valheim'] }))).toMatch(/needs 4-10 players, you have 1/);
+    expect(explainExclusion(g, a, owns({ alec: ['valheim'] }))).toMatch(
+      /needs 4-10 players, you have 1/,
+    );
   });
 
   test('explains missing owners by name', () => {

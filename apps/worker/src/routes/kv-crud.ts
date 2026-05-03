@@ -14,7 +14,8 @@ type Handler = (ctx: RouteCtx) => Promise<Response>;
 const handlers: { match: (parts: string[], method: string) => boolean; handler: Handler }[] = [
   // /people/<userId>/prefs
   {
-    match: (p, m) => p.length === 3 && p[0] === 'people' && p[2] === 'prefs' && (m === 'GET' || m === 'PUT'),
+    match: (p, m) =>
+      p.length === 3 && p[0] === 'people' && p[2] === 'prefs' && (m === 'GET' || m === 'PUT'),
     handler: async ({ request, env, groupId, parts }) => {
       const userId = parts[1]!;
       const key = `group:${groupId}:person:${userId}:prefs`;
@@ -27,7 +28,8 @@ const handlers: { match: (parts: string[], method: string) => boolean; handler: 
   },
   // /people/<userId>/owns/<gameId>
   {
-    match: (p, m) => p.length === 4 && p[0] === 'people' && p[2] === 'owns' && (m === 'GET' || m === 'PUT'),
+    match: (p, m) =>
+      p.length === 4 && p[0] === 'people' && p[2] === 'owns' && (m === 'GET' || m === 'PUT'),
     handler: async ({ request, env, groupId, parts }) => {
       const userId = parts[1]!;
       const gameId = parts[3]!;
@@ -41,7 +43,8 @@ const handlers: { match: (parts: string[], method: string) => boolean; handler: 
   },
   // /people/<userId>/tonight
   {
-    match: (p, m) => p.length === 3 && p[0] === 'people' && p[2] === 'tonight' && (m === 'GET' || m === 'PUT'),
+    match: (p, m) =>
+      p.length === 3 && p[0] === 'people' && p[2] === 'tonight' && (m === 'GET' || m === 'PUT'),
     handler: async ({ request, env, groupId, parts }) => {
       const userId = parts[1]!;
       const key = `group:${groupId}:person:${userId}:tonight`;
@@ -56,7 +59,8 @@ const handlers: { match: (parts: string[], method: string) => boolean; handler: 
   },
   // /games/<gameId>/status
   {
-    match: (p, m) => p.length === 3 && p[0] === 'games' && p[2] === 'status' && (m === 'GET' || m === 'PUT'),
+    match: (p, m) =>
+      p.length === 3 && p[0] === 'games' && p[2] === 'status' && (m === 'GET' || m === 'PUT'),
     handler: async ({ request, env, groupId, parts }) => {
       const gameId = parts[1]!;
       const key = `group:${groupId}:game-status:${gameId}`;
@@ -69,7 +73,8 @@ const handlers: { match: (parts: string[], method: string) => boolean; handler: 
   },
   // /games/<gameId>/progress
   {
-    match: (p, m) => p.length === 3 && p[0] === 'games' && p[2] === 'progress' && (m === 'GET' || m === 'PUT'),
+    match: (p, m) =>
+      p.length === 3 && p[0] === 'games' && p[2] === 'progress' && (m === 'GET' || m === 'PUT'),
     handler: async ({ request, env, groupId, parts }) => {
       const gameId = parts[1]!;
       const key = `group:${groupId}:game-progress:${gameId}`;
@@ -114,7 +119,8 @@ function validateStablePrefs(body: unknown): body is Record<string, number> {
   const dims = ['combat', 'grind', 'buildingDepth', 'commitmentLevel', 'pvpFocus', 'sessionLength'];
   const obj = body as Record<string, unknown>;
   for (const d of dims) {
-    if (typeof obj[d] !== 'number' || (obj[d] as number) < 1 || (obj[d] as number) > 5) return false;
+    if (typeof obj[d] !== 'number' || (obj[d] as number) < 1 || (obj[d] as number) > 5)
+      return false;
   }
   return true;
 }

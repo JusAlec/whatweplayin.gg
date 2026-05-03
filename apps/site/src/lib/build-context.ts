@@ -1,5 +1,10 @@
 import type {
-  Person, RecommendationContext, RatingCache, SessionRecord, OwnsLookup, StablePrefs,
+  Person,
+  RecommendationContext,
+  RatingCache,
+  SessionRecord,
+  OwnsLookup,
+  StablePrefs,
 } from '@gno/recommender';
 import { kv } from './kv-client.js';
 import { loadGroupBundle } from './people.js';

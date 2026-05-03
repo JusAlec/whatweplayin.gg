@@ -8,7 +8,8 @@ export default function SessionLog() {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
-    void kv.get<SessionRecord[]>('/sessions')
+    void kv
+      .get<SessionRecord[]>('/sessions')
       .then((s) => setSessions(s ?? []))
       .catch(() => setSessions([]));
   }, []);
@@ -29,7 +30,8 @@ export default function SessionLog() {
               <div>
                 <div className="font-medium">{getGame(s.gamePicked)?.name ?? s.gamePicked}</div>
                 <div className="text-xs text-muted">
-                  {new Date(s.startedAt).toLocaleString()} · {s.attendees.length} player{s.attendees.length === 1 ? '' : 's'}
+                  {new Date(s.startedAt).toLocaleString()} · {s.attendees.length} player
+                  {s.attendees.length === 1 ? '' : 's'}
                 </div>
               </div>
               <span className="text-muted">{isExp ? '−' : '+'}</span>
@@ -38,7 +40,10 @@ export default function SessionLog() {
               <div className="mt-2 text-sm text-muted">
                 <div>Attendees: {s.attendees.join(', ')}</div>
                 {s.recommendationScore != null && (
-                  <div>Score: {(s.recommendationScore * 100).toFixed(0)} (rank #{s.recommendedRank ?? 'manual'})</div>
+                  <div>
+                    Score: {(s.recommendationScore * 100).toFixed(0)} (rank #
+                    {s.recommendedRank ?? 'manual'})
+                  </div>
                 )}
                 {s.duration != null && <div>Duration: {s.duration}m</div>}
                 {s.milestonesHit && s.milestonesHit.length > 0 && (

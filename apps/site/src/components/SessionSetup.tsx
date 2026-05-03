@@ -42,7 +42,8 @@ export default function SessionSetup() {
                 checked={attending.has(p.id)}
                 onChange={() => {
                   const next = new Set(attending);
-                  if (next.has(p.id)) next.delete(p.id); else next.add(p.id);
+                  if (next.has(p.id)) next.delete(p.id);
+                  else next.add(p.id);
                   setAttending(next);
                 }}
               />

@@ -25,7 +25,12 @@ export function maxVarianceForGame(
   return max;
 }
 
-function collectFlags(_game: Game, ctx: RecommendationContext, conf: string, maxVar: number): GameFlag[] {
+function collectFlags(
+  _game: Game,
+  ctx: RecommendationContext,
+  conf: string,
+  maxVar: number,
+): GameFlag[] {
   const flags: GameFlag[] = [];
   if (conf === 'none' || conf === 'partial') flags.push('low-confidence');
   if (maxVar > HIGH_VARIANCE_THRESHOLD) flags.push('high-variance');
@@ -37,11 +42,15 @@ export function score(game: Game, ctx: RecommendationContext): ScoredGame {
   const w = ctx.group.scoringWeights;
   const pref = preferenceMatch(game, ctx.attendees, ctx.ratingCacheGroup, ctx.ratingCacheGlobal);
   const fit = groupFit(game, ctx.attendees);
-  const sess = sessionFit(game, ctx.tonight.timeAvailableMins, ctx.ratingCacheGroup, ctx.ratingCacheGlobal);
+  const sess = sessionFit(
+    game,
+    ctx.tonight.timeAvailableMins,
+    ctx.ratingCacheGroup,
+    ctx.ratingCacheGlobal,
+  );
   const nov = novelty(game, ctx.sessions);
 
-  const total =
-    w.preferenceMatch * pref + w.groupFit * fit + w.sessionFit * sess + w.novelty * nov;
+  const total = w.preferenceMatch * pref + w.groupFit * fit + w.sessionFit * sess + w.novelty * nov;
 
   const conf = confidenceLevel(ctx.ratingCacheGroup, ctx.ratingCacheGlobal, game.id);
   const maxVar = maxVarianceForGame(ctx.ratingCacheGroup, ctx.ratingCacheGlobal, game.id);
@@ -52,7 +61,11 @@ export function score(game: Game, ctx: RecommendationContext): ScoredGame {
     confidence: conf,
     maxVariance: maxVar,
     breakdown: {
-      preferenceMatch: { value: pref, weight: w.preferenceMatch, contribution: w.preferenceMatch * pref },
+      preferenceMatch: {
+        value: pref,
+        weight: w.preferenceMatch,
+        contribution: w.preferenceMatch * pref,
+      },
       groupFit: { value: fit, weight: w.groupFit, contribution: w.groupFit * fit },
       sessionFit: { value: sess, weight: w.sessionFit, contribution: w.sessionFit * sess },
       novelty: { value: nov, weight: w.novelty, contribution: w.novelty * nov },

@@ -2,12 +2,17 @@ import { test, expect, describe } from 'vitest';
 import { effectiveRating, confidenceLevel } from '../src/effective-rating.js';
 import type { RatingCache } from '../src/types.js';
 
-const cache = (avg: number, n: number, variance = 0.2): RatingCache['combat'] => ({
-  avg, variance, n,
-});
-
-const fullCache = (vals: Partial<Record<string, { avg: number; n: number; variance?: number }>>): RatingCache => {
-  const dims = ['combat', 'grind', 'buildingDepth', 'commitmentLevel', 'pvpFocus', 'sessionLength'] as const;
+const fullCache = (
+  vals: Partial<Record<string, { avg: number; n: number; variance?: number }>>,
+): RatingCache => {
+  const dims = [
+    'combat',
+    'grind',
+    'buildingDepth',
+    'commitmentLevel',
+    'pvpFocus',
+    'sessionLength',
+  ] as const;
   const out = {} as RatingCache;
   for (const d of dims) {
     const v = vals[d] ?? { avg: 3, n: 0, variance: 0 };

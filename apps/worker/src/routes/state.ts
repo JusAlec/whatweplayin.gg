@@ -46,7 +46,11 @@ export async function dispatchState(ctx: RouteCtx): Promise<Response | null> {
 }
 
 function safeParse(v: string): unknown {
-  try { return JSON.parse(v); } catch { return undefined; }
+  try {
+    return JSON.parse(v);
+  } catch {
+    return undefined;
+  }
 }
 
 function populate(out: State, key: string, value: unknown, groupId: string): void {

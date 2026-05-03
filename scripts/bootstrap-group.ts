@@ -9,7 +9,9 @@ const nameIdx = args.indexOf('--name');
 const peopleIdx = args.indexOf('--people');
 
 if (flagIdx === -1 || nameIdx === -1 || peopleIdx === -1) {
-  console.error('Usage: tsx bootstrap-group.ts --id <gid> --name <displayName> --people alec,mike,sarah,jordan,casey');
+  console.error(
+    'Usage: tsx bootstrap-group.ts --id <gid> --name <displayName> --people alec,mike,sarah,jordan,casey',
+  );
   process.exit(1);
 }
 
@@ -27,7 +29,14 @@ mkdirSync(dir, { recursive: true });
 const secret = randomBytes(16).toString('hex');
 const secretHash = createHash('sha256').update(secret).digest('hex');
 
-const NEUTRAL_PREFS = { combat: 3, grind: 3, buildingDepth: 3, commitmentLevel: 3, pvpFocus: 3, sessionLength: 3 };
+const NEUTRAL_PREFS = {
+  combat: 3,
+  grind: 3,
+  buildingDepth: 3,
+  commitmentLevel: 3,
+  pvpFocus: 3,
+  sessionLength: 3,
+};
 const people = peopleNames.map((name) => ({
   id: name.toLowerCase(),
   displayName: name,
@@ -45,5 +54,7 @@ writeFileSync(resolve(dir, 'people.json'), JSON.stringify(people, null, 2));
 writeFileSync(resolve(dir, 'group.json'), JSON.stringify(group, null, 2));
 
 console.log(`Group "${groupId}" created at ${dir}`);
-console.log(`\nGroup secret (write this in Cloudflare KV under group:${groupId}:secret):\n  ${secret}\n`);
+console.log(
+  `\nGroup secret (write this in Cloudflare KV under group:${groupId}:secret):\n  ${secret}\n`,
+);
 console.log(`Send members the URL: https://your-site.example/#g=${groupId}&s=${secret}`);

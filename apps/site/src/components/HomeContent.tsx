@@ -20,9 +20,7 @@ export default function HomeContent() {
     })();
   }, []);
 
-  const inProgress = CATALOG
-    .filter((g) => statuses[g.id] === 'in_progress')
-    .slice(0, 3);
+  const inProgress = CATALOG.filter((g) => statuses[g.id] === 'in_progress').slice(0, 3);
 
   return (
     <div className="flex flex-col gap-6">

@@ -6,7 +6,9 @@ import { CATALOG } from '../lib/catalog.js';
 import { loadGroupBundle } from '../lib/people.js';
 import { kv } from '../lib/kv-client.js';
 
-interface Props { personId: string; }
+interface Props {
+  personId: string;
+}
 
 export default function PersonDetail({ personId }: Props) {
   const [person, setPerson] = useState<Person | null>(null);
@@ -23,7 +25,8 @@ export default function PersonDetail({ personId }: Props) {
       setSavedPrefs(stored ?? me.stablePrefs);
       const ownership: Record<string, boolean> = {};
       for (const g of CATALOG) {
-        ownership[g.id] = (await kv.get<boolean | null>(`/people/${personId}/owns/${g.id}`)) ?? false;
+        ownership[g.id] =
+          (await kv.get<boolean | null>(`/people/${personId}/owns/${g.id}`)) ?? false;
       }
       setOwned(ownership);
     })();

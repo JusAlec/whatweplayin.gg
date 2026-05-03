@@ -6,11 +6,7 @@ export function passesFilter(game: Game, attendees: Person[], owns: OwnsLookup):
   return attendees.every((a) => owns[a.id]?.[game.id] === true);
 }
 
-export function explainExclusion(
-  game: Game,
-  attendees: Person[],
-  owns: OwnsLookup,
-): string {
+export function explainExclusion(game: Game, attendees: Person[], owns: OwnsLookup): string {
   const reasons: string[] = [];
   const n = attendees.length;
   if (n < game.minPlayers || n > game.maxPlayers) {

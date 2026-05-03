@@ -3,13 +3,26 @@ import { dimMatch, preferenceMatch } from '../src/preference-match.js';
 import type { Game, Person, RatingCache, StablePrefs } from '../src/types.js';
 
 const ALL = (n: number): StablePrefs => ({
-  combat: n, grind: n, buildingDepth: n, commitmentLevel: n, pvpFocus: n, sessionLength: n,
+  combat: n,
+  grind: n,
+  buildingDepth: n,
+  commitmentLevel: n,
+  pvpFocus: n,
+  sessionLength: n,
 });
 
 const game: Game = {
-  id: 'valheim', name: 'Valheim', minPlayers: 1, maxPlayers: 10,
-  optimalPlayers: { min: 2, max: 5 }, hostingModel: 'p2p', releaseStatus: 'released',
-  hasSinglePlayer: true, hasCoop: true, hasPvP: true, genre: ['survival'],
+  id: 'valheim',
+  name: 'Valheim',
+  minPlayers: 1,
+  maxPlayers: 10,
+  optimalPlayers: { min: 2, max: 5 },
+  hostingModel: 'p2p',
+  releaseStatus: 'released',
+  hasSinglePlayer: true,
+  hasCoop: true,
+  hasPvP: true,
+  genre: ['survival'],
 };
 
 const allRated = (avg: number): RatingCache => ({
@@ -22,7 +35,10 @@ const allRated = (avg: number): RatingCache => ({
 });
 
 const person = (prefs: StablePrefs, id = 'alec', weight?: number): Person => ({
-  id, displayName: id, stablePrefs: prefs, weight,
+  id,
+  displayName: id,
+  stablePrefs: prefs,
+  weight,
 });
 
 describe('dimMatch', () => {
@@ -59,10 +75,7 @@ describe('preferenceMatch', () => {
 
   test('attendee weight skews the average', () => {
     const cache = { valheim: allRated(3) };
-    const attendees = [
-      person(ALL(3), 'alec', 3),
-      person(ALL(5), 'mike', 1),
-    ];
+    const attendees = [person(ALL(3), 'alec', 3), person(ALL(5), 'mike', 1)];
     expect(preferenceMatch(game, attendees, cache, {})).toBeCloseTo(0.875);
   });
 

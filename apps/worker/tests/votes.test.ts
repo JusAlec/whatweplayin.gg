@@ -1,5 +1,5 @@
 import { test, expect, describe, beforeEach } from 'vitest';
-// @ts-expect-error
+// @ts-expect-error - cloudflare:test is provided by @cloudflare/vitest-pool-workers
 import { SELF, env } from 'cloudflare:test';
 
 const SECRET = { 'x-group-secret': 'topsecret' };
@@ -13,7 +13,8 @@ beforeEach(async () => {
 describe('vote write + cache recompute', () => {
   test('PUT vote stores it under per-user-game-dim key', async () => {
     await SELF.fetch('https://x/groups/g1/votes/alec/valheim/combat', {
-      method: 'PUT', headers: { ...SECRET, 'content-type': 'application/json' },
+      method: 'PUT',
+      headers: { ...SECRET, 'content-type': 'application/json' },
       body: JSON.stringify({ value: 4 }),
     });
     const stored = await env.KV.get('group:g1:vote:alec:valheim:combat');
@@ -25,11 +26,13 @@ describe('vote write + cache recompute', () => {
 
   test('vote write recomputes rating cache for that game', async () => {
     await SELF.fetch('https://x/groups/g1/votes/alec/valheim/combat', {
-      method: 'PUT', headers: { ...SECRET, 'content-type': 'application/json' },
+      method: 'PUT',
+      headers: { ...SECRET, 'content-type': 'application/json' },
       body: JSON.stringify({ value: 4 }),
     });
     await SELF.fetch('https://x/groups/g1/votes/mike/valheim/combat', {
-      method: 'PUT', headers: { ...SECRET, 'content-type': 'application/json' },
+      method: 'PUT',
+      headers: { ...SECRET, 'content-type': 'application/json' },
       body: JSON.stringify({ value: 2 }),
     });
     const cache = JSON.parse((await env.KV.get('group:g1:rating-cache:valheim'))!);
@@ -39,7 +42,8 @@ describe('vote write + cache recompute', () => {
 
   test('rejects vote outside 1-5', async () => {
     const res = await SELF.fetch('https://x/groups/g1/votes/alec/valheim/combat', {
-      method: 'PUT', headers: { ...SECRET, 'content-type': 'application/json' },
+      method: 'PUT',
+      headers: { ...SECRET, 'content-type': 'application/json' },
       body: JSON.stringify({ value: 6 }),
     });
     expect(res.status).toBe(400);
@@ -47,7 +51,8 @@ describe('vote write + cache recompute', () => {
 
   test('rejects unknown dimension', async () => {
     const res = await SELF.fetch('https://x/groups/g1/votes/alec/valheim/teamwork', {
-      method: 'PUT', headers: { ...SECRET, 'content-type': 'application/json' },
+      method: 'PUT',
+      headers: { ...SECRET, 'content-type': 'application/json' },
       body: JSON.stringify({ value: 4 }),
     });
     expect(res.status).toBe(400);

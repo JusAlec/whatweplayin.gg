@@ -15,9 +15,14 @@ export default function PeopleList() {
     <ul className="divide-y divide-border">
       {people.map((p) => (
         <li key={p.id} className="py-2 flex items-center justify-between">
-          <a href={`/people/${p.id}`} className="flex-1">{p.displayName}</a>
+          <a href={`/people/${p.id}`} className="flex-1">
+            {p.displayName}
+          </a>
           <button
-            onClick={() => { writeActivePerson(p.id); setActive(p.id); }}
+            onClick={() => {
+              writeActivePerson(p.id);
+              setActive(p.id);
+            }}
             className={`text-xs px-2 py-1 rounded border ${
               active === p.id ? 'bg-accent text-bg border-accent' : 'border-border text-muted'
             }`}

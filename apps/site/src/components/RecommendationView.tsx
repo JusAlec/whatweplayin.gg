@@ -6,7 +6,10 @@ import { buildContext } from '../lib/build-context.js';
 import { kv } from '../lib/kv-client.js';
 import PickCard from './PickCard.js';
 
-interface Props { attendees: string[]; timeMins: number; }
+interface Props {
+  attendees: string[];
+  timeMins: number;
+}
 
 export default function RecommendationView({ attendees, timeMins }: Props) {
   const [resp, setResp] = useState<RecommendationResponse | null>(null);

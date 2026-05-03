@@ -1,5 +1,5 @@
 import { test, expect, describe, beforeEach } from 'vitest';
-// @ts-expect-error
+// @ts-expect-error - cloudflare:test is provided by @cloudflare/vitest-pool-workers
 import { SELF, env } from 'cloudflare:test';
 
 const SECRET = { 'x-group-secret': 'topsecret' };
@@ -20,7 +20,8 @@ describe('sessions', () => {
       recommendedRank: 1,
     };
     const res = await SELF.fetch('https://x/groups/g1/sessions', {
-      method: 'POST', headers: { ...SECRET, 'content-type': 'application/json' },
+      method: 'POST',
+      headers: { ...SECRET, 'content-type': 'application/json' },
       body: JSON.stringify(session),
     });
     expect(res.status).toBe(200);
@@ -35,19 +36,21 @@ describe('sessions', () => {
     );
     await env.KV.put(
       'group:g1:session:2026-05-02T19:00:00Z',
-      JSON.stringify({ startedAt: '2026-05-02T19:00:00Z', attendees: ['alec'], gamePicked: 'valheim' }),
+      JSON.stringify({
+        startedAt: '2026-05-02T19:00:00Z',
+        attendees: ['alec'],
+        gamePicked: 'valheim',
+      }),
     );
     const res = await SELF.fetch('https://x/groups/g1/sessions', { headers: SECRET });
     const list = (await res.json()) as Array<{ startedAt: string }>;
-    expect(list.map((s) => s.startedAt)).toEqual([
-      '2026-05-02T19:00:00Z',
-      '2026-05-01T19:00:00Z',
-    ]);
+    expect(list.map((s) => s.startedAt)).toEqual(['2026-05-02T19:00:00Z', '2026-05-01T19:00:00Z']);
   });
 
   test('rejects session without required fields', async () => {
     const res = await SELF.fetch('https://x/groups/g1/sessions', {
-      method: 'POST', headers: { ...SECRET, 'content-type': 'application/json' },
+      method: 'POST',
+      headers: { ...SECRET, 'content-type': 'application/json' },
       body: JSON.stringify({ attendees: ['alec'] }),
     });
     expect(res.status).toBe(400);

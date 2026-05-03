@@ -20,9 +20,42 @@ function writeGroupFiles(): void {
   mkdirSync(publicGroupDir, { recursive: true });
 
   const people = [
-    { id: 'alec',  displayName: 'alec',  stablePrefs: { combat: 3, grind: 3, buildingDepth: 3, commitmentLevel: 3, pvpFocus: 3, sessionLength: 3 } },
-    { id: 'mike',  displayName: 'mike',  stablePrefs: { combat: 3, grind: 3, buildingDepth: 3, commitmentLevel: 3, pvpFocus: 3, sessionLength: 3 } },
-    { id: 'sarah', displayName: 'sarah', stablePrefs: { combat: 3, grind: 3, buildingDepth: 3, commitmentLevel: 3, pvpFocus: 3, sessionLength: 3 } },
+    {
+      id: 'alec',
+      displayName: 'alec',
+      stablePrefs: {
+        combat: 3,
+        grind: 3,
+        buildingDepth: 3,
+        commitmentLevel: 3,
+        pvpFocus: 3,
+        sessionLength: 3,
+      },
+    },
+    {
+      id: 'mike',
+      displayName: 'mike',
+      stablePrefs: {
+        combat: 3,
+        grind: 3,
+        buildingDepth: 3,
+        commitmentLevel: 3,
+        pvpFocus: 3,
+        sessionLength: 3,
+      },
+    },
+    {
+      id: 'sarah',
+      displayName: 'sarah',
+      stablePrefs: {
+        combat: 3,
+        grind: 3,
+        buildingDepth: 3,
+        commitmentLevel: 3,
+        pvpFocus: 3,
+        sessionLength: 3,
+      },
+    },
   ];
 
   const group = {
@@ -56,10 +89,7 @@ function seedWorkerKv(): void {
 
   // Ownership: each person owns the seeded game
   for (const person of PEOPLE) {
-    execSync(
-      `${base} "group:${GROUP_ID}:person:${person}:owns:${SEEDED_GAME_ID}" "true"`,
-      opts,
-    );
+    execSync(`${base} "group:${GROUP_ID}:person:${person}:owns:${SEEDED_GAME_ID}" "true"`, opts);
   }
 }
 

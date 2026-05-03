@@ -3,8 +3,12 @@ import type { StablePrefs, VotedDim } from '@gno/recommender';
 import { VOTED_DIMS } from '@gno/recommender';
 
 const LABELS: Record<VotedDim, string> = {
-  combat: 'Combat', grind: 'Grind', buildingDepth: 'Building',
-  commitmentLevel: 'Commitment', pvpFocus: 'PvP', sessionLength: 'Session length',
+  combat: 'Combat',
+  grind: 'Grind',
+  buildingDepth: 'Building',
+  commitmentLevel: 'Commitment',
+  pvpFocus: 'PvP',
+  sessionLength: 'Session length',
 };
 
 interface Props {

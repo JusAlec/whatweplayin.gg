@@ -6,11 +6,20 @@ import { CATALOG } from '../lib/catalog.js';
 import { loadGroupBundle } from '../lib/people.js';
 import { kv } from '../lib/kv-client.js';
 
-const NEUTRAL: StablePrefs = { combat: 3, grind: 3, buildingDepth: 3, commitmentLevel: 3, pvpFocus: 3, sessionLength: 3 };
+const NEUTRAL: StablePrefs = {
+  combat: 3,
+  grind: 3,
+  buildingDepth: 3,
+  commitmentLevel: 3,
+  pvpFocus: 3,
+  sessionLength: 3,
+};
 
 type Step = 'prefs' | 'played' | 'rate' | 'owned' | 'done';
 
-interface Props { personId: string; }
+interface Props {
+  personId: string;
+}
 
 export default function OnboardingWizard({ personId }: Props) {
   const [step, setStep] = useState<Step>('prefs');
@@ -50,7 +59,8 @@ export default function OnboardingWizard({ personId }: Props) {
                 checked={playedIds.has(g.id)}
                 onChange={() => {
                   const next = new Set(playedIds);
-                  if (next.has(g.id)) next.delete(g.id); else next.add(g.id);
+                  if (next.has(g.id)) next.delete(g.id);
+                  else next.add(g.id);
                   setPlayedIds(next);
                 }}
               />
@@ -79,7 +89,9 @@ export default function OnboardingWizard({ personId }: Props) {
           onClick={async () => {
             const v = pendingVotes[game.id] ?? NEUTRAL;
             for (const dim of VOTED_DIMS) {
-              await kv.put(`/votes/${personId}/${game.id}/${dim}`, { value: v[dim] }).catch(() => {});
+              await kv
+                .put(`/votes/${personId}/${game.id}/${dim}`, { value: v[dim] })
+                .catch(() => {});
             }
             if (rateIdx + 1 >= playedArr.length) setStep('owned');
             else setRateIdx(rateIdx + 1);
@@ -93,7 +105,10 @@ export default function OnboardingWizard({ personId }: Props) {
 
   if (step === 'owned') {
     return (
-      <Wrap title="Which games do you own?" subtitle="Hard filter — only owned games can be picked.">
+      <Wrap
+        title="Which games do you own?"
+        subtitle="Hard filter — only owned games can be picked."
+      >
         <ul className="divide-y divide-border">
           {CATALOG.map((g) => (
             <li key={g.id} className="flex items-center justify-between py-2">
@@ -104,7 +119,8 @@ export default function OnboardingWizard({ personId }: Props) {
                 checked={ownedIds.has(g.id)}
                 onChange={() => {
                   const next = new Set(ownedIds);
-                  if (next.has(g.id)) next.delete(g.id); else next.add(g.id);
+                  if (next.has(g.id)) next.delete(g.id);
+                  else next.add(g.id);
                   setOwnedIds(next);
                 }}
               />
@@ -135,7 +151,15 @@ export default function OnboardingWizard({ personId }: Props) {
   );
 }
 
-function Wrap({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+function Wrap({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-4">
       <header>

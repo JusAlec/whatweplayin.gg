@@ -10,7 +10,9 @@ export default function HomeShell() {
   useEffect(() => {
     setAuthed(readAuth() !== null);
     if (typeof window === 'undefined') return;
-    const onOnline = () => { void kv.flushPending(); };
+    const onOnline = () => {
+      void kv.flushPending();
+    };
     window.addEventListener('online', onOnline);
     void kv.flushPending();
     return () => window.removeEventListener('online', onOnline);

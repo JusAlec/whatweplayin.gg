@@ -1,22 +1,46 @@
 import { test, expect, describe } from 'vitest';
 import fc from 'fast-check';
 import { score, maxVarianceForGame } from '../src/score.js';
-import type { Game, Person, RatingCache, RecommendationContext, GroupSettings } from '../src/types.js';
+import type {
+  Game,
+  Person,
+  RatingCache,
+  RecommendationContext,
+  GroupSettings,
+} from '../src/types.js';
 
 const groupSettings: GroupSettings = {
-  id: 'g1', displayName: 'Test Group', secretHash: 'x',
+  id: 'g1',
+  displayName: 'Test Group',
+  secretHash: 'x',
   scoringWeights: { preferenceMatch: 0.4, groupFit: 0.25, sessionFit: 0.2, novelty: 0.15 },
 };
 
 const game: Game = {
-  id: 'valheim', name: 'Valheim', minPlayers: 1, maxPlayers: 10,
-  optimalPlayers: { min: 2, max: 5 }, hostingModel: 'p2p', releaseStatus: 'released',
-  hasSinglePlayer: true, hasCoop: true, hasPvP: true, genre: ['survival'],
+  id: 'valheim',
+  name: 'Valheim',
+  minPlayers: 1,
+  maxPlayers: 10,
+  optimalPlayers: { min: 2, max: 5 },
+  hostingModel: 'p2p',
+  releaseStatus: 'released',
+  hasSinglePlayer: true,
+  hasCoop: true,
+  hasPvP: true,
+  genre: ['survival'],
 };
 
 const person = (id: string, n: number): Person => ({
-  id, displayName: id,
-  stablePrefs: { combat: n, grind: n, buildingDepth: n, commitmentLevel: n, pvpFocus: n, sessionLength: n },
+  id,
+  displayName: id,
+  stablePrefs: {
+    combat: n,
+    grind: n,
+    buildingDepth: n,
+    commitmentLevel: n,
+    pvpFocus: n,
+    sessionLength: n,
+  },
 });
 
 const allRated = (avg: number): RatingCache => ({
@@ -61,7 +85,9 @@ describe('score', () => {
   });
 
   test('confidence is "none" when caches are empty', () => {
-    expect(score(game, ctx({ ratingCacheGroup: {}, ratingCacheGlobal: {} })).confidence).toBe('none');
+    expect(score(game, ctx({ ratingCacheGroup: {}, ratingCacheGlobal: {} })).confidence).toBe(
+      'none',
+    );
   });
 
   test('flags low-confidence when confidence is none', () => {
@@ -108,10 +134,13 @@ describe('property: score is always in [0, 1]', () => {
         fc.integer({ min: 1, max: 5 }),
         fc.integer({ min: 30, max: 480 }),
         (rating, time) => {
-          const r = score(game, ctx({
-            ratingCacheGroup: { valheim: allRated(rating) },
-            tonight: { timeAvailableMins: time, mood: null },
-          }));
+          const r = score(
+            game,
+            ctx({
+              ratingCacheGroup: { valheim: allRated(rating) },
+              tonight: { timeAvailableMins: time, mood: null },
+            }),
+          );
           return r.score >= 0 && r.score <= 1;
         },
       ),

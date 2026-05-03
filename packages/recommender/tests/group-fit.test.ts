@@ -3,16 +3,31 @@ import { groupFit } from '../src/group-fit.js';
 import type { Game, Person } from '../src/types.js';
 
 const game = (optMin: number, optMax: number, min = 1, max = 10): Game => ({
-  id: 'g', name: 'g', minPlayers: min, maxPlayers: max,
+  id: 'g',
+  name: 'g',
+  minPlayers: min,
+  maxPlayers: max,
   optimalPlayers: { min: optMin, max: optMax },
-  hostingModel: 'p2p', releaseStatus: 'released',
-  hasSinglePlayer: true, hasCoop: true, hasPvP: false, genre: ['survival'],
+  hostingModel: 'p2p',
+  releaseStatus: 'released',
+  hasSinglePlayer: true,
+  hasCoop: true,
+  hasPvP: false,
+  genre: ['survival'],
 });
 
 const attendees = (n: number): Person[] =>
   Array.from({ length: n }, (_, i) => ({
-    id: `p${i}`, displayName: `p${i}`,
-    stablePrefs: { combat: 3, grind: 3, buildingDepth: 3, commitmentLevel: 3, pvpFocus: 3, sessionLength: 3 },
+    id: `p${i}`,
+    displayName: `p${i}`,
+    stablePrefs: {
+      combat: 3,
+      grind: 3,
+      buildingDepth: 3,
+      commitmentLevel: 3,
+      pvpFocus: 3,
+      sessionLength: 3,
+    },
   }));
 
 describe('groupFit', () => {

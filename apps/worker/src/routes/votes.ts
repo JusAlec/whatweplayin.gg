@@ -1,6 +1,13 @@
 import type { Env } from '../index.js';
 
-const VOTED_DIMS = ['combat', 'grind', 'buildingDepth', 'commitmentLevel', 'pvpFocus', 'sessionLength'];
+const VOTED_DIMS = [
+  'combat',
+  'grind',
+  'buildingDepth',
+  'commitmentLevel',
+  'pvpFocus',
+  'sessionLength',
+];
 
 interface RouteCtx {
   request: Request;
@@ -54,8 +61,7 @@ async function recomputeRatingCache(env: Env, groupId: string, gameId: string): 
       continue;
     }
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
-    const variance =
-      values.reduce((sum, v) => sum + (v - avg) ** 2, 0) / values.length;
+    const variance = values.reduce((sum, v) => sum + (v - avg) ** 2, 0) / values.length;
     cache[dim] = { avg, variance, n: values.length };
   }
   await env.KV.put(
@@ -65,11 +71,16 @@ async function recomputeRatingCache(env: Env, groupId: string, gameId: string): 
 }
 
 async function safeJson(req: Request): Promise<unknown> {
-  try { return await req.json(); } catch { return null; }
+  try {
+    return await req.json();
+  } catch {
+    return null;
+  }
 }
 
 function badRequest(msg: string): Response {
   return new Response(JSON.stringify({ error: msg }), {
-    status: 400, headers: { 'content-type': 'application/json' },
+    status: 400,
+    headers: { 'content-type': 'application/json' },
   });
 }

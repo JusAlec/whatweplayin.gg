@@ -7,10 +7,7 @@ test.afterAll(() => teardownFixture());
 test('user can lock in a recommendation in under 60s', async ({ page }) => {
   // Pre-seed localStorage to skip the lock screen
   await page.addInitScript(() => {
-    localStorage.setItem(
-      'gno:auth',
-      JSON.stringify({ groupId: 'e2etest', secret: 'devsecret' }),
-    );
+    localStorage.setItem('gno:auth', JSON.stringify({ groupId: 'e2etest', secret: 'devsecret' }));
   });
 
   // Home page loads with the correct heading
@@ -28,12 +25,15 @@ test('user can lock in a recommendation in under 60s', async ({ page }) => {
 
   // Allow up to 10s for the recommendation engine (local + worker /state call)
   // to render a pick card with a "Lock in this pick" button
-  await expect(
-    page.getByRole('button', { name: /Lock in this pick/i }).first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: /Lock in this pick/i }).first()).toBeVisible({
+    timeout: 10_000,
+  });
 
   // Lock in the top pick — triggers worker POST + PUT, then navigates to /
-  await page.getByRole('button', { name: /Lock in this pick/i }).first().click();
+  await page
+    .getByRole('button', { name: /Lock in this pick/i })
+    .first()
+    .click();
 
   // Home page should now show the "In progress" section for the locked game
   await expect(page.getByText(/In progress/i)).toBeVisible({ timeout: 5_000 });

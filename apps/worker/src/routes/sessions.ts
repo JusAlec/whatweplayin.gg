@@ -35,11 +35,16 @@ export async function dispatchSessions(ctx: RouteCtx): Promise<Response | null> 
 }
 
 async function safeJson(req: Request): Promise<unknown> {
-  try { return await req.json(); } catch { return null; }
+  try {
+    return await req.json();
+  } catch {
+    return null;
+  }
 }
 
 function badRequest(msg: string): Response {
   return new Response(JSON.stringify({ error: msg }), {
-    status: 400, headers: { 'content-type': 'application/json' },
+    status: 400,
+    headers: { 'content-type': 'application/json' },
   });
 }

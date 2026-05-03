@@ -34,5 +34,6 @@
 GitHub Actions runs `wrangler deploy` for the worker after tests pass; Cloudflare Pages auto-deploys the site from the `main` branch.
 
 To enable CI deploy:
+
 - In GitHub repo → Settings → Secrets and variables → Actions, add `CLOUDFLARE_API_TOKEN` (with `Workers:Edit` and `Pages:Edit` permissions).
 - Set `CLOUDFLARE_ACCOUNT_ID` as a repo variable.

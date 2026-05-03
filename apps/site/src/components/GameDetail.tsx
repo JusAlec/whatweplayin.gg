@@ -5,9 +5,19 @@ import { getGame } from '../lib/catalog.js';
 import { kv } from '../lib/kv-client.js';
 
 const STATUSES = ['not_started', 'in_progress', 'shelved', 'completed', 'pending_update'] as const;
-const NEUTRAL: StablePrefs = { combat: 3, grind: 3, buildingDepth: 3, commitmentLevel: 3, pvpFocus: 3, sessionLength: 3 };
+const NEUTRAL: StablePrefs = {
+  combat: 3,
+  grind: 3,
+  buildingDepth: 3,
+  commitmentLevel: 3,
+  pvpFocus: 3,
+  sessionLength: 3,
+};
 
-interface Props { gameId: string; personId: string | null; }
+interface Props {
+  gameId: string;
+  personId: string | null;
+}
 
 export default function GameDetail({ gameId, personId }: Props) {
   const game = getGame(gameId);
@@ -20,12 +30,14 @@ export default function GameDetail({ gameId, personId }: Props) {
     (async () => {
       const s = await kv.get<string | null>(`/games/${gameId}/status`).catch(() => null);
       if (s) setStatus(s);
-      const cache = await kv.get<Record<VotedDim, { avg: number; n: number }> | null>(
-        `/state`,
-      ).catch(() => null);
+      const cache = await kv
+        .get<Record<VotedDim, { avg: number; n: number }> | null>(`/state`)
+        .catch(() => null);
       // best-effort: pull avg if available
       if (cache) {
-        const c = (cache as unknown as { ratingCache?: Record<string, Record<string, { avg: number }>> }).ratingCache?.[gameId];
+        const c = (
+          cache as unknown as { ratingCache?: Record<string, Record<string, { avg: number }>> }
+        ).ratingCache?.[gameId];
         if (c) {
           const avg = {} as Record<VotedDim, number>;
           for (const d of Object.keys(c) as VotedDim[]) avg[d] = c[d]!.avg;
@@ -35,7 +47,9 @@ export default function GameDetail({ gameId, personId }: Props) {
       if (personId) {
         const next = { ...NEUTRAL };
         for (const dim of Object.keys(NEUTRAL) as VotedDim[]) {
-          const v = await kv.get<{ value: number } | null>(`/votes/${personId}/${gameId}/${dim}`).catch(() => null);
+          const v = await kv
+            .get<{ value: number } | null>(`/votes/${personId}/${gameId}/${dim}`)
+            .catch(() => null);
           if (v) next[dim] = v.value;
         }
         setMyVotes(next);
@@ -65,7 +79,11 @@ export default function GameDetail({ gameId, personId }: Props) {
             }}
             className="w-full bg-panel border border-border rounded px-2 py-1 mt-1"
           >
-            {STATUSES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s.replace('_', ' ')}
+              </option>
+            ))}
           </select>
         </label>
       </section>
@@ -78,7 +96,9 @@ export default function GameDetail({ gameId, personId }: Props) {
             onChange={(e) => setGoal(e.target.value)}
             onBlur={async () => {
               if (goal.trim().length > 0) {
-                await kv.put(`/games/${gameId}/progress`, { customGoalProgress: goal }).catch(() => {});
+                await kv
+                  .put(`/games/${gameId}/progress`, { customGoalProgress: goal })
+                  .catch(() => {});
               }
             }}
             placeholder="e.g. kill all biome bosses"

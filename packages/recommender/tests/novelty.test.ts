@@ -3,9 +3,17 @@ import { novelty } from '../src/novelty.js';
 import type { Game, SessionRecord } from '../src/types.js';
 
 const game = (id: string): Game => ({
-  id, name: id, minPlayers: 1, maxPlayers: 4, optimalPlayers: { min: 1, max: 4 },
-  hostingModel: 'p2p', releaseStatus: 'released',
-  hasSinglePlayer: true, hasCoop: true, hasPvP: false, genre: ['survival'],
+  id,
+  name: id,
+  minPlayers: 1,
+  maxPlayers: 4,
+  optimalPlayers: { min: 1, max: 4 },
+  hostingModel: 'p2p',
+  releaseStatus: 'released',
+  hasSinglePlayer: true,
+  hasCoop: true,
+  hasPvP: false,
+  genre: ['survival'],
 });
 
 const session = (gameId: string, daysAgo: number): SessionRecord => ({
@@ -38,11 +46,7 @@ describe('novelty', () => {
   });
 
   test('penalties accumulate across multiple recent sessions', () => {
-    const sessions = [
-      session('valheim', 1),
-      session('valheim', 5),
-      session('ark-asa', 10),
-    ];
+    const sessions = [session('valheim', 1), session('valheim', 5), session('ark-asa', 10)];
     expect(novelty(game('valheim'), sessions)).toBe(0);
   });
 

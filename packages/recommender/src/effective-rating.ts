@@ -24,7 +24,9 @@ export function confidenceLevel(
   globalCache: Record<string, RatingCache | undefined>,
   gameId: string,
 ): GameConfidence {
-  const sources = VOTED_DIMS.map((d) => effectiveRating(groupCache, globalCache, gameId, d).confidence);
+  const sources = VOTED_DIMS.map(
+    (d) => effectiveRating(groupCache, globalCache, gameId, d).confidence,
+  );
   if (sources.every((s) => s === 'group')) return 'group';
   if (sources.every((s) => s === 'global')) return 'global';
   if (sources.every((s) => s === 'none')) return 'none';

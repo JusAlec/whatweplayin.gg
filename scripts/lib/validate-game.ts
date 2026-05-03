@@ -13,7 +13,8 @@ export function validateGame(game: unknown): ValidationResult {
   if (typeof g.id !== 'string') errors.push('id: required string');
   else if (!SLUG.test(g.id)) errors.push('id: must match ^[a-z0-9-]+$');
 
-  if (typeof g.name !== 'string' || g.name.length === 0) errors.push('name: required non-empty string');
+  if (typeof g.name !== 'string' || g.name.length === 0)
+    errors.push('name: required non-empty string');
 
   if (typeof g.minPlayers !== 'number') errors.push('minPlayers: required number');
   if (typeof g.maxPlayers !== 'number') errors.push('maxPlayers: required number');
