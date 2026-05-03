@@ -1,4 +1,5 @@
 import { checkAuth } from './auth.js';
+import { dispatchKvCrud } from './routes/kv-crud.js';
 
 export interface Env {
   KV: KVNamespace;
@@ -21,7 +22,11 @@ export default {
       const groupId = parts[1]!;
       const authFail = await checkAuth(request, env, groupId);
       if (authFail) return withCors(authFail);
-      // Routing TBD in subsequent tasks
+
+      const inner = parts.slice(2);
+      const crudResponse = await dispatchKvCrud({ request, env, groupId, parts: inner });
+      if (crudResponse) return withCors(crudResponse);
+
       return withCors(new Response('not found', { status: 404 }));
     }
 
