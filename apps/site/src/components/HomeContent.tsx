@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SessionRecord } from '@gno/recommender';
+import type { SessionRecord } from '@wwp/recommender';
 import { CATALOG, getGame } from '../lib/catalog.js';
 import { kv } from '../lib/kv-client.js';
 
@@ -25,7 +25,7 @@ export default function HomeContent() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-semibold">GameNight OS</h1>
+        <h1 className="text-2xl font-semibold">What We Playin</h1>
       </header>
 
       <a

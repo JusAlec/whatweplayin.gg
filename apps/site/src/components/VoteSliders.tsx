@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { StablePrefs, VotedDim } from '@gno/recommender';
-import { VOTED_DIMS } from '@gno/recommender';
+import type { StablePrefs, VotedDim } from '@wwp/recommender';
+import { VOTED_DIMS } from '@wwp/recommender';
 
 const LABELS: Record<VotedDim, string> = {
   combat: 'Combat',

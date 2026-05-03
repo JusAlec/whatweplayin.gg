@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Person } from '@gno/recommender';
+import type { Person } from '@wwp/recommender';
 import { loadGroupBundle } from '../lib/people.js';
 
 const TIME_PRESETS = [30, 60, 90, 120, 180, 240, 360];

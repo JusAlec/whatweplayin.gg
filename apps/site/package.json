@@ -1,5 +1,5 @@
 {
-  "name": "@gno/site",
+  "name": "@wwp/site",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "lint": "echo 'lint via root eslint'"
   },
   "dependencies": {
-    "@gno/recommender": "workspace:*",
+    "@wwp/recommender": "workspace:*",
     "astro": "^4.5.0",
     "@astrojs/react": "^3.1.0",
     "@astrojs/tailwind": "^5.1.0",

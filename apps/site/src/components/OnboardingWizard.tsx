@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { StablePrefs } from '@gno/recommender';
-import { VOTED_DIMS } from '@gno/recommender';
+import type { StablePrefs } from '@wwp/recommender';
+import { VOTED_DIMS } from '@wwp/recommender';
 import PrefSliders from './PrefSliders.js';
 import { CATALOG } from '../lib/catalog.js';
 import { loadGroupBundle } from '../lib/people.js';

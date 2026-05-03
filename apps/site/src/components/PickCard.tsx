@@ -1,4 +1,4 @@
-import type { ScoredGame } from '@gno/recommender';
+import type { ScoredGame } from '@wwp/recommender';
 import { getGame } from '../lib/catalog.js';
 
 const CONFIDENCE_LABEL = {

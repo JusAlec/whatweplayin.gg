@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Person } from '@gno/recommender';
+import type { Person } from '@wwp/recommender';
 import { loadGroupBundle } from '../lib/people.js';
 import { readActivePerson, writeActivePerson } from '../lib/auth.js';
 

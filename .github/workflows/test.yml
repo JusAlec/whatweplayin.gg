@@ -33,22 +33,22 @@ jobs:
         run: pnpm -r typecheck
 
       - name: Unit tests (recommender)
-        run: pnpm --filter @gno/recommender test
+        run: pnpm --filter @wwp/recommender test
 
       - name: Unit tests (scripts)
-        run: pnpm --filter @gno/scripts test
+        run: pnpm --filter @wwp/scripts test
 
       - name: Worker tests (miniflare)
-        run: pnpm --filter @gno/worker test
+        run: pnpm --filter @wwp/worker test
 
       - name: Site build
-        run: pnpm --filter @gno/site build
+        run: pnpm --filter @wwp/site build
 
       - name: Install Playwright browsers
-        run: pnpm --filter @gno/site exec playwright install --with-deps chromium
+        run: pnpm --filter @wwp/site exec playwright install --with-deps chromium
 
       - name: E2E
-        run: pnpm --filter @gno/site test:e2e
+        run: pnpm --filter @wwp/site test:e2e
         env:
           PUBLIC_WORKER_URL: http://localhost:8787
 
@@ -74,4 +74,4 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm --filter @gno/worker deploy
+        run: pnpm --filter @wwp/worker deploy

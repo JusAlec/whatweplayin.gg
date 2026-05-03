@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { RecommendationResponse } from '@gno/recommender';
-import { recommend } from '@gno/recommender';
+import type { RecommendationResponse } from '@wwp/recommender';
+import { recommend } from '@wwp/recommender';
 import { CATALOG, getGame } from '../lib/catalog.js';
 import { buildContext } from '../lib/build-context.js';
 import { kv } from '../lib/kv-client.js';

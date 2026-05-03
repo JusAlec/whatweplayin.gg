@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Game } from '@gno/recommender';
+import type { Game } from '@wwp/recommender';
 import { kv, NetworkError } from '../lib/kv-client.js';
 
 interface Props {

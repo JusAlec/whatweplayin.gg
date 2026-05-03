@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Person, StablePrefs } from '@gno/recommender';
+import type { Person, StablePrefs } from '@wwp/recommender';
 import PrefSliders from './PrefSliders.js';
 import OwnershipGrid from './OwnershipGrid.js';
 import { CATALOG } from '../lib/catalog.js';

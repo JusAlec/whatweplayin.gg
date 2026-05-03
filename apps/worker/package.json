@@ -1,5 +1,5 @@
 {
-  "name": "@gno/worker",
+  "name": "@wwp/worker",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "lint": "echo 'lint via root eslint'"
   },
   "dependencies": {
-    "@gno/recommender": "workspace:*"
+    "@wwp/recommender": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240403.0",

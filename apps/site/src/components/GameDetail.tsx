@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { StablePrefs, VotedDim } from '@gno/recommender';
+import type { StablePrefs, VotedDim } from '@wwp/recommender';
 import VoteSliders from './VoteSliders.js';
 import { getGame } from '../lib/catalog.js';
 import { kv } from '../lib/kv-client.js';

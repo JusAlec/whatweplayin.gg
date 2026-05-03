@@ -12,7 +12,7 @@ test('user can lock in a recommendation in under 60s', async ({ page }) => {
 
   // Home page loads with the correct heading
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'GameNight OS' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'What We Playin' })).toBeVisible();
 
   // Navigate to session setup
   await page.getByRole('link', { name: /Start Tonight's Session/i }).click();

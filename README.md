@@ -1,4 +1,4 @@
-# GameNight OS
+# What We Playin
 
 Decide which survival game to play tonight, fast.
 

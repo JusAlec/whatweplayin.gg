@@ -31,7 +31,7 @@ test('GET /state returns aggregated group state', async () => {
     ownership: Record<string, Record<string, boolean>>;
     sessions: Array<{ gamePicked: string }>;
   };
-  expect(body.ratingCache.valheim.combat.n).toBe(2);
-  expect(body.ownership.alec.valheim).toBe(true);
-  expect(body.sessions[0].gamePicked).toBe('valheim');
+  expect(body.ratingCache.valheim?.combat?.n).toBe(2);
+  expect(body.ownership.alec?.valheim).toBe(true);
+  expect(body.sessions[0]?.gamePicked).toBe('valheim');
 });

@@ -1,4 +1,4 @@
-import type { Person, GroupSettings } from '@gno/recommender';
+import type { Person, GroupSettings } from '@wwp/recommender';
 import { readAuth } from './auth.js';
 
 interface GroupBundle {

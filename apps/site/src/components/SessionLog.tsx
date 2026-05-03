@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SessionRecord } from '@gno/recommender';
+import type { SessionRecord } from '@wwp/recommender';
 import { getGame } from '../lib/catalog.js';
 import { kv } from '../lib/kv-client.js';
 

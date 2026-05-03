@@ -1,5 +1,5 @@
 import games from '@data/games.json' assert { type: 'json' };
-import type { Game } from '@gno/recommender';
+import type { Game } from '@wwp/recommender';
 
 export const CATALOG = games as Game[];
 

@@ -41,7 +41,7 @@ export default {
     }
 
     if (parts.length === 0) {
-      return withCors(new Response('GameNight OS worker', { status: 200 }));
+      return withCors(new Response('What We Playin worker', { status: 200 }));
     }
 
     return withCors(new Response('not found', { status: 404 }));

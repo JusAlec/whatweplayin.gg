@@ -18,7 +18,7 @@ export default defineConfig({
       // Wrangler local dev — KV is persisted to .wrangler/state-test so the
       // fixture can pre-seed secrets via `wrangler kv key put --local`.
       command:
-        'pnpm --filter @gno/worker exec wrangler dev --port 8787 --persist-to .wrangler/state-test',
+        'pnpm --filter @wwp/worker exec wrangler dev --port 8787 --persist-to .wrangler/state-test',
       url: 'http://localhost:8787',
       reuseExistingServer: true,
       timeout: 60_000,

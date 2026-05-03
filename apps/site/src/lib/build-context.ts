@@ -5,7 +5,7 @@ import type {
   SessionRecord,
   OwnsLookup,
   StablePrefs,
-} from '@gno/recommender';
+} from '@wwp/recommender';
 import { kv } from './kv-client.js';
 import { loadGroupBundle } from './people.js';
 
