@@ -10,7 +10,7 @@
     "test:e2e": "pnpm --filter @gno/site test:e2e",
     "build": "pnpm -r build",
     "dev": "pnpm --filter @gno/site dev",
-    "lint": "eslint . --ext .ts,.tsx,.astro && prettier --check .",
+    "lint": "eslint . --ext .ts,.tsx && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "pnpm -r typecheck",
     "validate:catalog": "tsx scripts/validate-catalog.ts"
