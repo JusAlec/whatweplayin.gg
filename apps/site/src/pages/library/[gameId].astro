@@ -1,0 +1,17 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import GameDetailWrap from '../../components/GameDetailWrap.tsx';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+export async function getStaticPaths() {
+  const file = fileURLToPath(new URL('../../../../../data/games.json', import.meta.url));
+  const games = JSON.parse(readFileSync(file, 'utf8')) as Array<{ id: string }>;
+  return games.map((g) => ({ params: { gameId: g.id } }));
+}
+
+const { gameId } = Astro.params;
+---
+<Layout title={`Game — ${gameId}`} activeTab="library">
+  <GameDetailWrap gameId={gameId!} client:only="react" />
+</Layout>

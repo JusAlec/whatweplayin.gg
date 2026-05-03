@@ -40,3 +40,14 @@ function readAuthFromHash(): AuthState | null {
   }
   return null;
 }
+
+const ACTIVE_PERSON_KEY = 'gno:activePerson';
+
+export function readActivePerson(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(ACTIVE_PERSON_KEY);
+}
+
+export function writeActivePerson(personId: string): void {
+  window.localStorage.setItem(ACTIVE_PERSON_KEY, personId);
+}
