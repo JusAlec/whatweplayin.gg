@@ -73,11 +73,18 @@ export interface RatingCacheEntry {
 
 export type RatingCache = Record<VotedDim, RatingCacheEntry>;
 
+/** A per-person tonight input; what the recommender consumes is the same shape minus atTimestamp. */
 export interface TonightInput {
-  mood?: number;
-  timeAvailableMins?: number | null;
+  mood: number | null;
+  timeAvailableMins: number | null;
   atTimestamp: string;
 }
+
+/** Aggregated tonight context fed to the recommender (averaged or chosen across attendees). */
+export type TonightContext = Omit<TonightInput, 'atTimestamp'>;
+
+/** Set of flag strings emitted by score(); extend when adding new flag conditions. */
+export type GameFlag = 'low-confidence' | 'high-variance' | 'solo' | 'never-played-by-anyone';
 
 export type OwnsLookup = Record<string, Record<string, boolean>>;
 
@@ -98,14 +105,14 @@ export interface ScoredGame {
     sessionFit: ScoredDimensionContribution;
     novelty: ScoredDimensionContribution;
   };
-  flags: string[];
+  flags: GameFlag[];
 }
 
 export interface RecommendationContext {
   group: GroupSettings;
   attendees: Person[];
   owns: OwnsLookup;
-  tonight: { timeAvailableMins: number | null; mood: number | null };
+  tonight: TonightContext;
   sessions: SessionRecord[];
   ratingCacheGroup: Record<string, RatingCache | undefined>;
   ratingCacheGlobal: Record<string, RatingCache | undefined>;
