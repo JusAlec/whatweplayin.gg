@@ -1,5 +1,7 @@
 import { checkAuth } from './auth.js';
 import { dispatchKvCrud } from './routes/kv-crud.js';
+import { dispatchVotes } from './routes/votes.js';
+import { dispatchSessions } from './routes/sessions.js';
 
 export interface Env {
   KV: KVNamespace;
@@ -24,7 +26,12 @@ export default {
       if (authFail) return withCors(authFail);
 
       const inner = parts.slice(2);
-      const crudResponse = await dispatchKvCrud({ request, env, groupId, parts: inner });
+      const innerCtx = { request, env, groupId, parts: inner };
+      const voteResp = await dispatchVotes(innerCtx);
+      if (voteResp) return withCors(voteResp);
+      const sessionResp = await dispatchSessions(innerCtx);
+      if (sessionResp) return withCors(sessionResp);
+      const crudResponse = await dispatchKvCrud(innerCtx);
       if (crudResponse) return withCors(crudResponse);
 
       return withCors(new Response('not found', { status: 404 }));
