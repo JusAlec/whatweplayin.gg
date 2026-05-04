@@ -26,28 +26,37 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Check or create D1 namespace
+      - name: Create or get D1 namespace
         id: d1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          set -euo pipefail
-          # Get list of existing namespaces as JSON
-          EXISTING=$(pnpm --filter @wwp/worker exec wrangler d1 list --json 2>/dev/null || echo "[]")
-          ID=$(echo "$EXISTING" | jq -r '.[] | select(.name == "whatweplayin-prod") | .uuid' || true)
+          set -e
+          # Try create first — wrangler returns the ID whether it succeeded
+          # or failed because it already exists.
+          CREATE_OUT=$(pnpm --filter @wwp/worker exec wrangler d1 create whatweplayin-prod 2>&1 || true)
+          echo "=== wrangler d1 create output ==="
+          echo "$CREATE_OUT"
+          echo "================================="
 
-          if [ -n "$ID" ] && [ "$ID" != "null" ]; then
-            echo "D1 namespace 'whatweplayin-prod' already exists with id: $ID"
-          else
-            echo "Creating D1 namespace 'whatweplayin-prod'..."
-            CREATE_OUT=$(pnpm --filter @wwp/worker exec wrangler d1 create whatweplayin-prod 2>&1)
-            echo "$CREATE_OUT"
-            ID=$(echo "$CREATE_OUT" | grep -oE 'database_id = "[^"]+"' | cut -d'"' -f2 | head -1)
-            if [ -z "$ID" ]; then
-              echo "Failed to extract database_id from create output" >&2
-              exit 1
-            fi
+          # Extract any UUID from the output. Both success and "already exists"
+          # output the database_id as a UUID somewhere in the text.
+          ID=$(echo "$CREATE_OUT" | grep -oE '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1)
+
+          if [ -z "$ID" ]; then
+            echo "create output didn't yield a UUID — falling back to list"
+            LIST_OUT=$(pnpm --filter @wwp/worker exec wrangler d1 list 2>&1 || true)
+            echo "=== wrangler d1 list output ==="
+            echo "$LIST_OUT"
+            echo "==============================="
+            # Match the line containing 'whatweplayin-prod' and extract a UUID from it
+            ID=$(echo "$LIST_OUT" | grep 'whatweplayin-prod' | grep -oE '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1)
+          fi
+
+          if [ -z "$ID" ]; then
+            echo "::error::Could not determine database_id from any wrangler output above"
+            exit 1
           fi
 
           echo "database_id=$ID" >> "$GITHUB_OUTPUT"
