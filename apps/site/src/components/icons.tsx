@@ -75,3 +75,32 @@ export function CloseIcon({ size = 16, className }: IconProps) {
     </svg>
   );
 }
+
+export function ThumbUpIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg {...baseProps(size, className)}>
+      <path d="M7 10v12" />
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H7V10l4-7c.27-.5.85-.96 1.5-.5C13.69 3.46 14 5 14 6.21" />
+    </svg>
+  );
+}
+
+export function ThumbDownIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg {...baseProps(size, className)}>
+      <path d="M17 14V2" />
+      <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H17v12l-4 7c-.27.5-.85.96-1.5.5-1.19-.84-1.5-2.38-1.5-3.5" />
+    </svg>
+  );
+}
+
+export function RefreshIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg {...baseProps(size, className)}>
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+      <path d="M8 16H3v5" />
+    </svg>
+  );
+}
