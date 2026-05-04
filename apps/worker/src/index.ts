@@ -1,4 +1,5 @@
 import { dispatchAuth } from './routes/auth.js';
+import { dispatchConfig } from './routes/config.js';
 import { dispatchGroups } from './routes/groups.js';
 import { dispatchInvites, dispatchInviteByCode } from './routes/invites.js';
 import { dispatchMe } from './routes/me.js';
@@ -54,6 +55,8 @@ export default {
         baseUrl: env.BETTER_AUTH_URL ?? `${url.protocol}//${url.host}`,
       });
       if (authResp) return withCors(authResp, request, env);
+      const configResp = await dispatchConfig({ request, env, parts: apiParts });
+      if (configResp) return withCors(configResp, request, env);
       const groupsResp = await dispatchGroups({ request, env, parts: apiParts });
       if (groupsResp) return withCors(groupsResp, request, env);
       const meResp = await dispatchMe({ request, env, parts: apiParts });
