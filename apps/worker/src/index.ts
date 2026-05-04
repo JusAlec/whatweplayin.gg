@@ -1,5 +1,6 @@
 import { dispatchAuth } from './routes/auth.js';
 import { dispatchGroups } from './routes/groups.js';
+import { dispatchInvites } from './routes/invites.js';
 import { dispatchMe } from './routes/me.js';
 import { dispatchKvCrud } from './routes/kv-crud.js';
 import { dispatchVotes } from './routes/votes.js';
@@ -41,6 +42,8 @@ export default {
       if (groupsResp) return withCors(groupsResp);
       const meResp = await dispatchMe({ request, env, parts: apiParts });
       if (meResp) return withCors(meResp);
+      const invitesResp = await dispatchInvites({ request, env, parts: apiParts });
+      if (invitesResp) return withCors(invitesResp);
       return withCors(new Response('not found', { status: 404 }));
     }
 
