@@ -12,6 +12,7 @@
     "lint": "echo 'lint via root eslint'"
   },
   "dependencies": {
+    "@wwp/auth-shared": "workspace:*",
     "@wwp/recommender": "workspace:*"
   },
   "devDependencies": {

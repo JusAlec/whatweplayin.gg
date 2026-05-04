@@ -72,6 +72,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@wwp/auth-shared':
+        specifier: workspace:*
+        version: link:../../packages/auth-shared
       '@wwp/recommender':
         specifier: workspace:*
         version: link:../../packages/recommender
