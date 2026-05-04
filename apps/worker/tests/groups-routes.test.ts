@@ -135,3 +135,54 @@ describe('GET /api/groups/:gid', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('PATCH /api/groups/:gid', () => {
+  test('creator can update display_name and weights', async () => {
+    const create = await SELF.fetch('https://x/api/groups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSessionId}` },
+      body: JSON.stringify({ displayName: 'OldName' }),
+    });
+    const created = (await create.json()) as { id: string };
+
+    const res = await SELF.fetch(`https://x/api/groups/${created.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSessionId}` },
+      body: JSON.stringify({
+        displayName: 'NewName',
+        scoringWeights: { preferenceMatch: 0.5, groupFit: 0.2, sessionFit: 0.2, novelty: 0.1 },
+      }),
+    });
+    expect(res.status).toBe(200);
+    const updated = await db().groups.getById(created.id);
+    expect(updated?.displayName).toBe('NewName');
+    expect(updated?.scoringWeights.preferenceMatch).toBe(0.5);
+  });
+
+  test('non-creator member gets 403', async () => {
+    const create = await SELF.fetch('https://x/api/groups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSessionId}` },
+      body: JSON.stringify({ displayName: 'RIVALS' }),
+    });
+    const created = (await create.json()) as { id: string };
+
+    const now = new Date().toISOString();
+    await db().users.insert({
+      id: 'u_mike', email: 'mike@test.co', emailVerified: true, displayName: 'Mike',
+      avatarUrl: null, createdAt: now, updatedAt: now,
+    });
+    await db().groupMembers.insert({
+      groupId: created.id, userId: 'u_mike', role: 'member',
+      joinedAt: now, weight: 1.0, stablePrefs: null,
+    });
+    const mikeSession = await createSessionForUser(env.DB, 'u_mike');
+
+    const res = await SELF.fetch(`https://x/api/groups/${created.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${mikeSession}` },
+      body: JSON.stringify({ displayName: 'Hijack' }),
+    });
+    expect(res.status).toBe(403);
+  });
+});

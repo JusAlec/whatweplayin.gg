@@ -96,6 +96,40 @@ export async function dispatchGroups(ctx: RouteCtx): Promise<Response | null> {
     return jsonStatus({ group, members }, 200);
   }
 
+  // PATCH /api/groups/:gid → creator-only
+  if (parts.length === 2 && request.method === 'PATCH') {
+    const gid = parts[1]!;
+    const memberRow = (await env.DB
+      .prepare('SELECT role FROM group_members WHERE group_id = ? AND user_id = ?')
+      .bind(gid, session.user.id)
+      .first()) as { role?: string } | null;
+    if (!memberRow) return jsonStatus({ error: 'forbidden' }, 403);
+    if (memberRow.role !== 'creator') return jsonStatus({ error: 'forbidden — creator only' }, 403);
+
+    const body = await safeJson(request);
+    const parsed = CreateGroupRequestSchema.partial().safeParse(body);
+    if (!parsed.success) return jsonStatus({ error: 'invalid input' }, 400);
+
+    const updates: string[] = [];
+    const binds: unknown[] = [];
+    if (parsed.data.displayName !== undefined) {
+      updates.push('display_name = ?');
+      binds.push(parsed.data.displayName);
+    }
+    if (parsed.data.scoringWeights !== undefined) {
+      updates.push('scoring_weights = ?');
+      binds.push(JSON.stringify(parsed.data.scoringWeights));
+    }
+    if (updates.length === 0) return jsonStatus({ error: 'no fields to update' }, 400);
+
+    binds.push(gid);
+    await env.DB
+      .prepare(`UPDATE groups SET ${updates.join(', ')} WHERE id = ?`)
+      .bind(...binds)
+      .run();
+    return jsonStatus({ ok: true }, 200);
+  }
+
   return null;
 }
 
