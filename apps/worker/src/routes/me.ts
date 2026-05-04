@@ -138,6 +138,21 @@ export async function dispatchMe(ctx: RouteCtx): Promise<Response | null> {
     }
   }
 
+  // POST /api/me/enrich-more — continue enrichment for current user without
+  // re-fetching the library. Used by the frontend auto-loop after initial sync
+  // to chip away at un-enriched games batch by batch (~20 per call) within
+  // the Cloudflare Workers free-tier 50-subrequest cap.
+  if (parts.length === 2 && parts[1] === 'enrich-more' && request.method === 'POST') {
+    try {
+      const { enrichUserGames } = await import('../lib/steam-sync.js');
+      const result = await enrichUserGames(env, session.user.id);
+      return jsonStatus({ ok: true, ...result }, 200);
+    } catch (err) {
+      console.error('enrich-more failed:', err);
+      return jsonStatus({ error: 'enrich-failed', message: String(err) }, 502);
+    }
+  }
+
   return null;
 }
 

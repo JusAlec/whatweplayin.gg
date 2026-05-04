@@ -120,6 +120,45 @@ export async function syncSteamLibrary(
   };
 }
 
+/**
+ * Run another batch of enrichment for un-enriched games owned by `userId`,
+ * WITHOUT calling Steam Web API for the library (we already have ownership).
+ * Used by the frontend auto-loop to continue enrichment after initial sync
+ * without burning extra GetOwnedGames calls.
+ */
+export async function enrichUserGames(
+  env: Env,
+  userId: string,
+  opts: SyncOptions = {},
+): Promise<{ enriched: number; unenrichedRemaining: number }> {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const parallelism = opts.enrichmentParallelism ?? 6;
+  const maxPerRun = readNumber(env, 'WWP_ENRICHMENT_MAX_PER_RUN', 20);
+
+  // Find un-enriched games owned by this user.
+  const result = await env.DB.prepare(
+    `SELECT g.id, g.steam_app_id FROM games g
+        JOIN game_ownership go ON go.game_id = g.id
+       WHERE go.user_id = ?
+         AND (g.metadata_synced_at = '' OR g.metadata_synced_at IS NULL)
+       LIMIT ?`,
+  )
+    .bind(userId, maxPerRun * 2)
+    .all();
+
+  const eligible = (result.results as Array<{ id: string; steam_app_id: number }>)
+    .filter((row) => !isAppidSkipped(row.steam_app_id))
+    .slice(0, maxPerRun);
+
+  for (let i = 0; i < eligible.length; i += parallelism) {
+    const batch = eligible.slice(i, i + parallelism);
+    await Promise.all(batch.map((row) => enrichOne(env, row.id, row.steam_app_id, fetchImpl)));
+  }
+
+  const unenrichedRemaining = await countUnenrichedForUser(env, userId);
+  return { enriched: eligible.length, unenrichedRemaining };
+}
+
 async function countUnenrichedForUser(env: Env, userId: string): Promise<number> {
   const row = (await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM games g
