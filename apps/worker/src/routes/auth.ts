@@ -23,10 +23,11 @@ interface AuthCtx {
   env: Env;
   parts: string[]; // segments after `/api/`
   baseUrl: string;
+  ctx: ExecutionContext;
 }
 
 export async function dispatchAuth(ctx: AuthCtx): Promise<Response | null> {
-  const { request, env, parts, baseUrl } = ctx;
+  const { request, env, parts, baseUrl, ctx: execCtx } = ctx;
   if (parts[0] !== 'auth') return null;
   const sub = parts.slice(1);
 
@@ -182,6 +183,42 @@ export async function dispatchAuth(ctx: AuthCtx): Promise<Response | null> {
             .run();
         }
       }
+
+      // v2.1: trigger initial Steam library sync. Block on ownership upserts
+      // (cheap, ~1s), defer enrichment to ctx.waitUntil (~5-15s background).
+      try {
+        const { syncSteamLibrary } = await import('../lib/steam-sync.js');
+        const { SteamPrivateProfileError } = await import('../lib/steam-api.js');
+        try {
+          await syncSteamLibrary(env, linkSession.user.id, steamId, {
+            enrichmentEnabled: false,
+          });
+          // Background enrichment.
+          execCtx.waitUntil(
+            (async () => {
+              try {
+                await syncSteamLibrary(env, linkSession.user.id, steamId, {
+                  enrichmentEnabled: true,
+                });
+              } catch (bgErr) {
+                console.error('background enrichment after link failed:', bgErr);
+              }
+            })(),
+          );
+        } catch (err) {
+          if (err instanceof SteamPrivateProfileError) {
+            return new Response(null, {
+              status: 302,
+              headers: { location: `${baseUrl}/who?linkError=steam-private` },
+            });
+          }
+          throw err;
+        }
+      } catch (outerErr) {
+        console.error('initial sync after link failed:', outerErr);
+        // Allow link to proceed; user can retry via /me Refresh button.
+      }
+
       return new Response(null, {
         status: 302,
         headers: { location: `${baseUrl}/who?linked=steam` },

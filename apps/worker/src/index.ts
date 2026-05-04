@@ -53,6 +53,7 @@ export default {
         env,
         parts: apiParts,
         baseUrl: env.BETTER_AUTH_URL ?? `${url.protocol}//${url.host}`,
+        ctx,
       });
       if (authResp) return withCors(authResp, request, env);
       const configResp = await dispatchConfig({ request, env, parts: apiParts });
