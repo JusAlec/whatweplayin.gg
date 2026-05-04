@@ -47,11 +47,17 @@ export async function getSessionFromRequest(
   return { session, user };
 }
 
-export function sessionCookie(sessionId: string): string {
-  const maxAge = Math.floor(SESSION_TTL_MS / 1000);
-  return `${COOKIE_NAME}=${sessionId}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
+export interface CookieOptions {
+  domain?: string;
 }
 
-export function clearSessionCookie(): string {
-  return `${COOKIE_NAME}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
+export function sessionCookie(sessionId: string, opts?: CookieOptions): string {
+  const maxAge = Math.floor(SESSION_TTL_MS / 1000);
+  const domain = opts?.domain ? `; Domain=${opts.domain}` : '';
+  return `${COOKIE_NAME}=${sessionId}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}${domain}`;
+}
+
+export function clearSessionCookie(opts?: CookieOptions): string {
+  const domain = opts?.domain ? `; Domain=${opts.domain}` : '';
+  return `${COOKIE_NAME}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0${domain}`;
 }

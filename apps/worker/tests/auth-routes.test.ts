@@ -53,7 +53,8 @@ describe('GET /api/auth/callback/magic', () => {
       redirect: 'manual',
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get('location')).toBe('/who');
+    // baseUrl in tests = request origin (no BETTER_AUTH_URL env), so location is absolute
+    expect(res.headers.get('location')).toMatch(/\/who$/);
     expect(res.headers.get('set-cookie')).toContain('wwp_session=');
 
     const user = await env.DB.prepare('SELECT * FROM users WHERE email = ?')
