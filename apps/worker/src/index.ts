@@ -6,6 +6,14 @@ import { dispatchState } from './routes/state.js';
 
 export interface Env {
   KV: KVNamespace;
+  DB: D1Database;
+  BETTER_AUTH_SECRET: string;
+  BETTER_AUTH_URL?: string;
+  // Added in later tasks:
+  RESEND_API_KEY?: string;
+  STEAM_API_KEY?: string;
+  IGDB_CLIENT_ID?: string;
+  IGDB_CLIENT_SECRET?: string;
 }
 
 export default {
