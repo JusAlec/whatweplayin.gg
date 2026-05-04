@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api, AuthError } from '../lib/api-client.js';
 import type { Group, GroupInvite, GroupMember } from '@wwp/auth-shared';
-import { ArrowLeftIcon } from './icons.js';
+import { ArrowLeftIcon, RefreshIcon } from './icons.js';
+import GameCard from './GameCard.js';
+import { useConfig } from '../lib/useConfig.js';
 
 interface Props {
   gid: string;
@@ -12,12 +14,42 @@ interface MemberWithUser extends GroupMember {
   avatarUrl: string | null;
 }
 
+interface GameSummary {
+  id: string;
+  name: string;
+  coverUrl: string | null;
+  steamReviewScoreDesc: string | null;
+  steamReviewPctPositive: number | null;
+  steamReviewCount: number | null;
+  metadataSyncedAt: string | null;
+  hasCoop: boolean;
+  hasPvp: boolean;
+  hasSingleplayer: boolean;
+}
+
+interface RecommendationPick {
+  game: GameSummary;
+  ownerCount: number;
+  groupSize: number;
+  thumbs: { up: number; down: number };
+  yourVote: -1 | 0 | 1;
+  flags: string[];
+}
+
+interface RecommendationsResp {
+  picks: RecommendationPick[];
+  coldStart: boolean;
+}
+
 export default function GroupHomeMinimal({ gid }: Props) {
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<MemberWithUser[]>([]);
   const [invites, setInvites] = useState<GroupInvite[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [recs, setRecs] = useState<RecommendationsResp | null>(null);
+  const [recsBusy, setRecsBusy] = useState(false);
+  const { flags: featureFlags } = useConfig();
 
   async function load() {
     setError(null);
@@ -43,6 +75,25 @@ export default function GroupHomeMinimal({ gid }: Props) {
   useEffect(() => {
     load();
   }, [gid]);
+
+  async function loadRecs() {
+    setRecsBusy(true);
+    try {
+      const r = await api.get<RecommendationsResp>(`/api/groups/${gid}/recommendations`);
+      setRecs(r);
+    } catch (err) {
+      console.error('recommendations fetch failed:', err);
+    } finally {
+      setRecsBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (featureFlags.recommendations && group) {
+      void loadRecs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [featureFlags.recommendations, group]);
 
   async function createInvite() {
     setBusy(true);
@@ -127,6 +178,53 @@ export default function GroupHomeMinimal({ gid }: Props) {
           ))}
         </ul>
       </section>
+
+      {featureFlags.recommendations && (
+        <section className="space-y-2">
+          <header className="flex items-center gap-2">
+            <h2 className="text-lg font-medium">Recommended tonight</h2>
+            {recs?.coldStart && (
+              <span className="text-xs font-normal text-muted">
+                (using Steam ratings — vote thumbs to personalize)
+              </span>
+            )}
+            <button
+              onClick={() => void loadRecs()}
+              disabled={recsBusy}
+              aria-label="Refresh recommendations"
+              title="Refresh recommendations"
+              className="ml-auto rounded p-1 text-muted hover:bg-panel hover:text-text disabled:opacity-50"
+            >
+              <RefreshIcon />
+            </button>
+          </header>
+          {recs === null ? (
+            <p className="text-sm text-muted">Loading…</p>
+          ) : recs.picks.length === 0 ? (
+            <p className="text-sm text-muted">
+              No multiplayer games in your shared library yet. Have someone link Steam, or wait for
+              thumb-down vetoes to lift.
+            </p>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {recs.picks.map((p) => (
+                <GameCard
+                  key={p.game.id}
+                  game={p.game}
+                  groupId={gid}
+                  ownerCount={p.ownerCount}
+                  groupSize={p.groupSize}
+                  thumbs={p.thumbs}
+                  yourVote={p.yourVote}
+                  flags={p.flags}
+                  showThumbs={featureFlags.thumbs}
+                  showRating={featureFlags.steamRatings}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
