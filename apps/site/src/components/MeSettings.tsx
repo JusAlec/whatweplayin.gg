@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, AuthError } from '../lib/api-client.js';
 import { fetchMe, signOut, type MeResponse } from '../lib/auth.js';
+import { ArrowLeftIcon, SignOutIcon } from './icons.js';
 
 const WORKER_URL = (import.meta.env.PUBLIC_WORKER_URL as string) ?? 'http://localhost:8787';
 
@@ -64,14 +65,19 @@ export default function MeSettings() {
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between gap-3">
-        <a href="/who" className="text-sm text-muted hover:text-text">
-          ← Dashboard
+        <a
+          href="/who"
+          className="inline-flex items-center gap-1.5 rounded p-1 text-sm text-muted transition hover:text-text"
+        >
+          <ArrowLeftIcon /> Dashboard
         </a>
         <button
           onClick={() => void signOut()}
-          className="text-sm text-muted underline hover:text-text"
+          aria-label="Sign out"
+          title="Sign out"
+          className="rounded p-2 text-muted transition hover:bg-bg hover:text-text"
         >
-          Sign out
+          <SignOutIcon />
         </button>
       </header>
 
