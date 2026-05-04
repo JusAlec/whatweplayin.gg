@@ -70,11 +70,7 @@ export default {
     }
 
     if (parts.length === 0)
-      return withCors(
-        new Response('WhatWePlayin worker (v2.0)', { status: 200 }),
-        request,
-        env,
-      );
+      return withCors(new Response('WhatWePlayin worker (v2.0)', { status: 200 }), request, env);
     return withCors(new Response('not found', { status: 404 }), request, env);
   },
 } satisfies ExportedHandler<Env>;
