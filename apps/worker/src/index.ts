@@ -9,6 +9,7 @@ import { dispatchSessions } from './routes/sessions.js';
 import { dispatchState } from './routes/state.js';
 import { dispatchThumbs } from './routes/thumbs.js';
 import { dispatchLibrary } from './routes/library.js';
+import { dispatchRecommendations } from './routes/recommendations.js';
 import { checkAuth as checkGroupSecret } from './auth.js';
 
 export interface Env {
@@ -72,6 +73,12 @@ export default {
       if (thumbsResp) return withCors(thumbsResp, request, env);
       const libraryResp = await dispatchLibrary({ request, env, parts: apiParts });
       if (libraryResp) return withCors(libraryResp, request, env);
+      const recommendationsResp = await dispatchRecommendations({
+        request,
+        env,
+        parts: apiParts,
+      });
+      if (recommendationsResp) return withCors(recommendationsResp, request, env);
       return withCors(new Response('not found', { status: 404 }), request, env);
     }
 
