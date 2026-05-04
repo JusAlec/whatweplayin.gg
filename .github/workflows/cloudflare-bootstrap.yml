@@ -76,7 +76,7 @@ jobs:
         run: |
           # Wrangler reads database_id from wrangler.toml — if it's still PLACEHOLDER, this will fail with a clear error.
           # That's expected on the first run (before user updates wrangler.toml with the captured ID).
-          pnpm --filter @wwp/worker exec wrangler d1 migrations apply whatweplayin-prod --remote --yes || {
+          pnpm --filter @wwp/worker exec wrangler d1 migrations apply whatweplayin-prod --remote || {
             echo "::warning::Migration apply failed — likely because wrangler.toml still has PLACEHOLDER_REPLACE_AFTER_CREATE. Update wrangler.toml with the captured database_id (see step output above), commit, push, then re-run this workflow."
             exit 0
           }
