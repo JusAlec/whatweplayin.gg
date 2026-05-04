@@ -6,9 +6,14 @@ interface Props {
   gid: string;
 }
 
+interface MemberWithUser extends GroupMember {
+  displayName: string;
+  avatarUrl: string | null;
+}
+
 export default function GroupHomeMinimal({ gid }: Props) {
   const [group, setGroup] = useState<Group | null>(null);
-  const [members, setMembers] = useState<GroupMember[]>([]);
+  const [members, setMembers] = useState<MemberWithUser[]>([]);
   const [invites, setInvites] = useState<GroupInvite[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -17,7 +22,7 @@ export default function GroupHomeMinimal({ gid }: Props) {
     setError(null);
     try {
       const [detail, inv] = await Promise.all([
-        api.get<{ group: Group; members: GroupMember[] }>(`/api/groups/${gid}`),
+        api.get<{ group: Group; members: MemberWithUser[] }>(`/api/groups/${gid}`),
         api
           .get<{ invites: GroupInvite[] }>(`/api/groups/${gid}/invites`)
           .catch(() => ({ invites: [] as GroupInvite[] })),
@@ -99,8 +104,17 @@ export default function GroupHomeMinimal({ gid }: Props) {
         <h2 className="text-sm uppercase text-muted">Members</h2>
         <ul className="divide-y divide-border rounded bg-panel">
           {members.map((m) => (
-            <li key={m.userId} className="flex justify-between p-3 text-sm">
-              <span className="font-mono">{m.userId.slice(0, 10)}…</span>
+            <li key={m.userId} className="flex items-center gap-3 p-3 text-sm">
+              {m.avatarUrl ? (
+                <img
+                  src={m.avatarUrl}
+                  alt=""
+                  className="h-8 w-8 rounded-full border border-border"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full border border-border bg-bg" />
+              )}
+              <span className="flex-1 font-medium">{m.displayName}</span>
               <span className="text-xs text-muted">{m.role}</span>
             </li>
           ))}
