@@ -12,15 +12,18 @@
     "lint": "echo 'lint via root eslint'"
   },
   "dependencies": {
+    "@better-auth/cli": "^1.4.21",
     "@wwp/auth-shared": "workspace:*",
-    "@wwp/recommender": "workspace:*"
+    "@wwp/recommender": "workspace:*",
+    "better-auth": "^1.6.9",
+    "ulid": "^3.0.2"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240403.0",
-    "wrangler": "^3.50.0",
-    "vitest": "1.3.0",
     "@cloudflare/vitest-pool-workers": "^0.1.0",
+    "@cloudflare/workers-types": "^4.20240403.0",
     "miniflare": "^3.20240404.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "1.3.0",
+    "wrangler": "^3.50.0"
   }
 }
