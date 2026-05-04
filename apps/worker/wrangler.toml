@@ -14,7 +14,7 @@ enabled = true
 [[d1_databases]]
 binding = "DB"
 database_name = "whatweplayin-prod"
-database_id = "PLACEHOLDER_REPLACE_AFTER_CREATE"
+database_id = "f95b424a-288d-4d6c-9d5b-9189cb178198"
 migrations_dir = "migrations"
 
 [triggers]
