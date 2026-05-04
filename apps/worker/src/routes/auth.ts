@@ -4,6 +4,7 @@ import { Db } from '../lib/d1-client.js';
 import { generateMagicLinkToken, validateMagicLinkToken } from '../auth/magic-link.js';
 import {
   createSessionForUser,
+  getSessionFromRequest,
   sessionCookie,
   clearSessionCookie,
 } from '../auth/session-helpers.js';
@@ -102,20 +103,92 @@ export async function dispatchAuth(ctx: AuthCtx): Promise<Response | null> {
     return new Response(null, { status: 302, headers: { location: loginUrl } });
   }
 
-  // GET /api/auth/callback/steam — verify + create user + session
+  // GET /api/auth/link/steam → require session, redirect to Steam with intent=link
+  if (sub[0] === 'link' && sub[1] === 'steam' && request.method === 'GET') {
+    const linkSession = await getSessionFromRequest(env.DB, request);
+    if (!linkSession) {
+      return new Response(null, { status: 302, headers: { location: `${baseUrl}/signin` } });
+    }
+    const url = new URL(request.url);
+    const apiOrigin = `${url.protocol}//${url.host}`;
+    const loginUrl = buildSteamLoginUrl({
+      realm: apiOrigin,
+      // Steam strips arbitrary query params on the realm match but echoes
+      // openid.return_to back, so the intent flag survives the round trip.
+      returnTo: `${apiOrigin}/api/auth/callback/steam?intent=link`,
+    });
+    return new Response(null, { status: 302, headers: { location: loginUrl } });
+  }
+
+  // GET /api/auth/callback/steam — verify + (sign in OR link to current user)
   if (sub[0] === 'callback' && sub[1] === 'steam' && request.method === 'GET') {
     const callbackUrl = new URL(request.url);
+    const intent = callbackUrl.searchParams.get('intent');
     const steamId = await verifySteamOpenIDResponse(callbackUrl);
     if (!steamId) return new Response('Steam verification failed', { status: 401 });
 
     const dbi = new Db(env.DB);
-
     const existing = (await env.DB.prepare(
       'SELECT user_id FROM oauth_accounts WHERE provider = ? AND provider_user_id = ?',
     )
       .bind('steam', steamId)
       .first()) as { user_id?: string } | null;
 
+    if (intent === 'link') {
+      const linkSession = await getSessionFromRequest(env.DB, request);
+      if (!linkSession) {
+        return new Response(null, { status: 302, headers: { location: `${baseUrl}/signin` } });
+      }
+      if (existing?.user_id && existing.user_id !== linkSession.user.id) {
+        // Steam already attached to a different user — refuse to silently steal it.
+        return new Response(null, {
+          status: 302,
+          headers: { location: `${baseUrl}/who?linkError=steam-already-linked` },
+        });
+      }
+      if (!existing?.user_id) {
+        const profile = env.STEAM_API_KEY
+          ? await fetchSteamProfile(steamId, env.STEAM_API_KEY)
+          : null;
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          'INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, provider_data, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+          .bind(
+            ulid(),
+            linkSession.user.id,
+            'steam',
+            steamId,
+            profile ? JSON.stringify(profile) : null,
+            now,
+          )
+          .run();
+        // Lift display_name + avatar from Steam if user hasn't set their own.
+        // Heuristic: display_name still equals the email local-part means default;
+        // avatar_url null means never set. Both → safe to overwrite from Steam.
+        if (profile) {
+          await env.DB.prepare(
+            `UPDATE users
+                SET display_name = CASE
+                      WHEN email IS NOT NULL AND display_name = SUBSTR(email, 1, INSTR(email, '@') - 1)
+                        THEN ?
+                      ELSE display_name
+                    END,
+                    avatar_url = COALESCE(avatar_url, ?),
+                    updated_at = ?
+              WHERE id = ?`,
+          )
+            .bind(profile.personaname, profile.avatarfull, now, linkSession.user.id)
+            .run();
+        }
+      }
+      return new Response(null, {
+        status: 302,
+        headers: { location: `${baseUrl}/who?linked=steam` },
+      });
+    }
+
+    // intent != 'link' → original sign-in / create-user flow
     let userId: string;
     if (existing?.user_id) {
       userId = existing.user_id;

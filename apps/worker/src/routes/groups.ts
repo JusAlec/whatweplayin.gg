@@ -92,7 +92,27 @@ export async function dispatchGroups(ctx: RouteCtx): Promise<Response | null> {
     const group = await dbi.groups.getById(gid);
     if (!group) return jsonStatus({ error: 'not found' }, 404);
 
-    const members = await dbi.groupMembers.listByGroup(gid);
+    // JOIN users to include displayName + avatarUrl on each member.
+    const memberRows = await env.DB.prepare(
+      `SELECT gm.user_id, gm.role, gm.joined_at, gm.weight, gm.stable_prefs,
+              u.display_name, u.avatar_url
+         FROM group_members gm
+         JOIN users u ON u.id = gm.user_id
+        WHERE gm.group_id = ?
+        ORDER BY gm.joined_at ASC`,
+    )
+      .bind(gid)
+      .all();
+    const members = (memberRows.results as Record<string, unknown>[]).map((r) => ({
+      groupId: gid,
+      userId: r.user_id as string,
+      role: r.role as string,
+      joinedAt: r.joined_at as string,
+      weight: r.weight as number,
+      stablePrefs: r.stable_prefs ? JSON.parse(r.stable_prefs as string) : null,
+      displayName: r.display_name as string,
+      avatarUrl: (r.avatar_url as string | null) ?? null,
+    }));
     return jsonStatus({ group, members }, 200);
   }
 
