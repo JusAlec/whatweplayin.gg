@@ -1,7 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import HomeShell from '../components/HomeShell.tsx';
+import HomeRedirect from '../components/HomeRedirect.tsx';
 ---
-<Layout title="What We Playin">
-  <HomeShell client:only="react" />
+<Layout title="WhatWePlayin">
+  <HomeRedirect client:load />
 </Layout>
