@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, AuthError } from '../lib/api-client.js';
 import { fetchMe, signOut, type MeResponse } from '../lib/auth.js';
-import { CloseIcon, LogInIcon, PlusIcon, SettingsIcon, SignOutIcon } from './icons.js';
+import { CloseIcon, PlusIcon, SettingsIcon, SignOutIcon } from './icons.js';
 
 type AddMode = 'idle' | 'create' | 'join';
 
@@ -201,11 +201,92 @@ export default function WhosPlayingMinimal() {
       )}
 
       <section>
-        <h2 className="mb-2 text-lg font-medium">Your groups</h2>
+        <header className="mb-2 flex items-center justify-between">
+          <h2 className="text-lg font-medium">Your groups</h2>
+          <button
+            type="button"
+            onClick={() => (addMode === 'idle' ? setAddMode('create') : resetAdd())}
+            aria-label={addMode === 'idle' ? 'Add a group' : 'Close'}
+            title={addMode === 'idle' ? 'Add a group' : 'Close'}
+            className="rounded p-2 text-muted transition hover:bg-panel hover:text-text"
+          >
+            {addMode === 'idle' ? <PlusIcon /> : <CloseIcon />}
+          </button>
+        </header>
+
+        {addMode !== 'idle' && (
+          <div className="mb-3 space-y-3 rounded border border-border bg-panel p-3">
+            <div className="flex gap-1 rounded bg-bg p-1 text-sm">
+              <button
+                type="button"
+                onClick={() => setAddMode('create')}
+                className={`flex-1 rounded px-3 py-1.5 transition ${
+                  addMode === 'create'
+                    ? 'bg-accent font-medium text-white'
+                    : 'text-muted hover:text-text'
+                }`}
+              >
+                Create new group
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddMode('join')}
+                className={`flex-1 rounded px-3 py-1.5 transition ${
+                  addMode === 'join'
+                    ? 'bg-accent font-medium text-white'
+                    : 'text-muted hover:text-text'
+                }`}
+              >
+                Join with code
+              </button>
+            </div>
+
+            {addMode === 'create' ? (
+              <form onSubmit={createGroup} className="flex gap-2">
+                <input
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  placeholder="Group name"
+                  className="min-w-0 flex-1 rounded border border-border bg-bg px-3 py-2"
+                  disabled={busy}
+                  autoFocus
+                  key="create-input"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !createName.trim()}
+                  className="shrink-0 rounded bg-accent px-4 py-2 text-white disabled:opacity-60"
+                >
+                  Create
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={joinGroup} className="flex gap-2">
+                <input
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value)}
+                  placeholder="Invite code"
+                  className="min-w-0 flex-1 rounded border border-border bg-bg px-3 py-2 font-mono"
+                  disabled={busy}
+                  autoFocus
+                  key="join-input"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !joinCode.trim()}
+                  className="shrink-0 rounded bg-accent px-4 py-2 text-white disabled:opacity-60"
+                >
+                  Join
+                </button>
+              </form>
+            )}
+          </div>
+        )}
+
         {groups === null ? (
           <p className="text-muted text-sm">Loading…</p>
         ) : groups.length === 0 ? (
-          <p className="text-muted text-sm">No groups yet. Create or join one below.</p>
+          <p className="text-muted text-sm">No groups yet. Tap + to create or join one.</p>
         ) : (
           <ul className="space-y-2">
             {groups.map((g) => (
@@ -221,107 +302,6 @@ export default function WhosPlayingMinimal() {
             ))}
           </ul>
         )}
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="text-lg font-medium">Add a group</h2>
-        <div className="flex gap-2">
-          <div
-            className={`transition-all duration-200 ${
-              addMode === 'create' ? 'flex-1' : addMode === 'join' ? 'shrink-0' : 'flex-1'
-            }`}
-          >
-            {addMode === 'create' ? (
-              <form onSubmit={createGroup} className="flex gap-2">
-                <input
-                  value={createName}
-                  onChange={(e) => setCreateName(e.target.value)}
-                  placeholder="Group name"
-                  className="min-w-0 flex-1 rounded border border-border bg-panel px-3 py-2"
-                  disabled={busy}
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  disabled={busy || !createName.trim()}
-                  className="shrink-0 rounded bg-accent px-4 py-2 text-white disabled:opacity-60"
-                >
-                  Create
-                </button>
-                <button
-                  type="button"
-                  onClick={resetAdd}
-                  aria-label="Cancel"
-                  title="Cancel"
-                  className="shrink-0 rounded p-2 text-muted hover:bg-panel hover:text-text"
-                >
-                  <CloseIcon />
-                </button>
-              </form>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setAddMode('create')}
-                aria-label="Create a group"
-                title="Create a group"
-                className={`flex w-full items-center justify-center gap-2 rounded border border-border bg-panel px-4 py-2 text-sm font-medium transition hover:border-accent hover:text-accent ${
-                  addMode === 'join' ? 'aspect-square px-3' : ''
-                }`}
-              >
-                <PlusIcon />
-                {addMode !== 'join' && <span>Create</span>}
-              </button>
-            )}
-          </div>
-
-          <div
-            className={`transition-all duration-200 ${
-              addMode === 'join' ? 'flex-1' : addMode === 'create' ? 'shrink-0' : 'flex-1'
-            }`}
-          >
-            {addMode === 'join' ? (
-              <form onSubmit={joinGroup} className="flex gap-2">
-                <input
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value)}
-                  placeholder="Invite code"
-                  className="min-w-0 flex-1 rounded border border-border bg-panel px-3 py-2 font-mono"
-                  disabled={busy}
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  disabled={busy || !joinCode.trim()}
-                  className="shrink-0 rounded bg-accent px-4 py-2 text-white disabled:opacity-60"
-                >
-                  Join
-                </button>
-                <button
-                  type="button"
-                  onClick={resetAdd}
-                  aria-label="Cancel"
-                  title="Cancel"
-                  className="shrink-0 rounded p-2 text-muted hover:bg-panel hover:text-text"
-                >
-                  <CloseIcon />
-                </button>
-              </form>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setAddMode('join')}
-                aria-label="Join with invite code"
-                title="Join with invite code"
-                className={`flex w-full items-center justify-center gap-2 rounded border border-border bg-panel px-4 py-2 text-sm font-medium transition hover:border-accent hover:text-accent ${
-                  addMode === 'create' ? 'aspect-square px-3' : ''
-                }`}
-              >
-                <LogInIcon />
-                {addMode !== 'create' && <span>Join</span>}
-              </button>
-            )}
-          </div>
-        </div>
       </section>
     </div>
   );
