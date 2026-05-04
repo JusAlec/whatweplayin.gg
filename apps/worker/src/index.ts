@@ -19,6 +19,20 @@ export interface Env {
   STEAM_API_KEY?: string;
   IGDB_CLIENT_ID?: string;
   IGDB_CLIENT_SECRET?: string;
+
+  // v2.1 behavior toggles (read with `=== 'true'` semantics)
+  WWP_FEAT_AUTOSYNC_ON_LOGIN?: string;
+  WWP_FEAT_THUMBS?: string;
+  WWP_FEAT_RECOMMENDATIONS?: string;
+  WWP_FEAT_STEAM_RATINGS?: string;
+
+  // v2.1 tunables
+  WWP_AUTOSYNC_STALENESS_HOURS?: string;
+  WWP_WEIGHT_THUMBS?: string;
+  WWP_WEIGHT_OWNERSHIP?: string;
+  WWP_WEIGHT_NOVELTY?: string;
+  WWP_RECOMMENDATIONS_LIMIT?: string;
+  WWP_THUMBS_DOWN_VETO_DAYS?: string;
 }
 
 export default {
