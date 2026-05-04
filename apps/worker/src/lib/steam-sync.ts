@@ -71,9 +71,7 @@ export async function syncSteamLibrary(
       gamesAdded++;
     }
 
-    const lastPlayed = g.rtimeLastPlayed
-      ? new Date(g.rtimeLastPlayed * 1000).toISOString()
-      : null;
+    const lastPlayed = g.rtimeLastPlayed ? new Date(g.rtimeLastPlayed * 1000).toISOString() : null;
     await env.DB.prepare(
       `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, last_played_at, added_at)
          VALUES (?, ?, 'steam', ?, ?, ?)

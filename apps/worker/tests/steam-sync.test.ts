@@ -149,9 +149,7 @@ describe('syncSteamLibrary — removed games cleanup', () => {
     });
 
     expect(result.ownershipRemoved).toBe(1);
-    const remaining = await env.DB.prepare(
-      'SELECT game_id FROM game_ownership WHERE user_id = ?',
-    )
+    const remaining = await env.DB.prepare('SELECT game_id FROM game_ownership WHERE user_id = ?')
       .bind('u1')
       .all();
     const ids = remaining.results.map((r: any) => r.game_id);
@@ -216,9 +214,7 @@ describe('syncSteamLibrary — enrichment', () => {
       enrichmentParallelism: 1,
     });
 
-    const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?')
-      .bind('steam-730')
-      .first();
+    const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?').bind('steam-730').first();
     expect(game).not.toBeNull();
     expect((game as any).name).toBe('Counter-Strike 2');
     expect((game as any).cover_url).toBe('https://cdn.example/header.jpg');
@@ -320,5 +316,50 @@ describe('syncSteamLibrary — enrichment', () => {
     expect((game as any).has_singleplayer).toBe(1);
     expect((game as any).steam_review_pct_positive).toBeNull();
     expect((game as any).metadata_synced_at).not.toBe('');
+  });
+});
+
+describe('syncSteamLibrary — ownership removed count edge cases', () => {
+  test('returns 0 when no games are removed (empty library, empty pre-state)', async () => {
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ response: { game_count: 0, games: [] } }), { status: 200 }),
+    );
+    const result = await syncSteamLibrary(env, 'u1', '76561198000000001', {
+      fetchImpl: fakeFetch as typeof fetch,
+      enrichmentEnabled: false,
+    });
+    expect(result.ownershipRemoved).toBe(0);
+  });
+
+  test('returns 0 when sync returns same library (no removals needed)', async () => {
+    const now = new Date().toISOString();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier)
+         VALUES (?, ?, ?, ?, 'auto')`,
+      ).bind('steam-100', 'Game', 100, now),
+      env.DB.prepare(
+        `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, added_at)
+         VALUES ('u1', 'steam-100', 'steam', 50, ?)`,
+      ).bind(now),
+    ]);
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            response: {
+              game_count: 1,
+              games: [{ appid: 100, name: 'Game', playtime_forever: 60, rtime_last_played: 0 }],
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    const result = await syncSteamLibrary(env, 'u1', '76561198000000001', {
+      fetchImpl: fakeFetch as typeof fetch,
+      enrichmentEnabled: false,
+    });
+    expect(result.ownershipRemoved).toBe(0);
   });
 });
