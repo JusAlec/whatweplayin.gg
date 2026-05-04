@@ -13,6 +13,8 @@ export interface Env {
   DB: D1Database;
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL?: string;
+  SITE_ORIGIN?: string;
+  SESSION_COOKIE_DOMAIN?: string;
   RESEND_API_KEY?: string;
   STEAM_API_KEY?: string;
   IGDB_CLIENT_ID?: string;
@@ -25,7 +27,7 @@ export default {
     const parts = url.pathname.split('/').filter(Boolean);
 
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders() });
+      return new Response(null, { status: 204, headers: corsHeaders(request, env) });
     }
 
     // /api/auth/* routes (no group-secret check; uses session cookie)
@@ -37,54 +39,67 @@ export default {
         parts: apiParts,
         baseUrl: env.BETTER_AUTH_URL ?? `${url.protocol}//${url.host}`,
       });
-      if (authResp) return withCors(authResp);
+      if (authResp) return withCors(authResp, request, env);
       const groupsResp = await dispatchGroups({ request, env, parts: apiParts });
-      if (groupsResp) return withCors(groupsResp);
+      if (groupsResp) return withCors(groupsResp, request, env);
       const meResp = await dispatchMe({ request, env, parts: apiParts });
-      if (meResp) return withCors(meResp);
+      if (meResp) return withCors(meResp, request, env);
       const invitesResp = await dispatchInvites({ request, env, parts: apiParts });
-      if (invitesResp) return withCors(invitesResp);
+      if (invitesResp) return withCors(invitesResp, request, env);
       const inviteByCodeResp = await dispatchInviteByCode({ request, env, parts: apiParts });
-      if (inviteByCodeResp) return withCors(inviteByCodeResp);
-      return withCors(new Response('not found', { status: 404 }));
+      if (inviteByCodeResp) return withCors(inviteByCodeResp, request, env);
+      return withCors(new Response('not found', { status: 404 }), request, env);
     }
 
     // v1 /groups/<gid>/* routes — group-secret auth (preserved for backwards compat)
     if (parts[0] === 'groups' && parts.length >= 2) {
       const groupId = parts[1]!;
       const authFail = await checkGroupSecret(request, env, groupId);
-      if (authFail) return withCors(authFail);
+      if (authFail) return withCors(authFail, request, env);
       const inner = parts.slice(2);
       const innerCtx = { request, env, groupId, parts: inner };
       const stateResp = await dispatchState(innerCtx);
-      if (stateResp) return withCors(stateResp);
+      if (stateResp) return withCors(stateResp, request, env);
       const voteResp = await dispatchVotes(innerCtx);
-      if (voteResp) return withCors(voteResp);
+      if (voteResp) return withCors(voteResp, request, env);
       const sessionResp = await dispatchSessions(innerCtx);
-      if (sessionResp) return withCors(sessionResp);
+      if (sessionResp) return withCors(sessionResp, request, env);
       const crudResponse = await dispatchKvCrud(innerCtx);
-      if (crudResponse) return withCors(crudResponse);
-      return withCors(new Response('not found', { status: 404 }));
+      if (crudResponse) return withCors(crudResponse, request, env);
+      return withCors(new Response('not found', { status: 404 }), request, env);
     }
 
     if (parts.length === 0)
-      return withCors(new Response('WhatWePlayin worker (v2.0)', { status: 200 }));
-    return withCors(new Response('not found', { status: 404 }));
+      return withCors(
+        new Response('WhatWePlayin worker (v2.0)', { status: 200 }),
+        request,
+        env,
+      );
+    return withCors(new Response('not found', { status: 404 }), request, env);
   },
 } satisfies ExportedHandler<Env>;
 
-function corsHeaders(): HeadersInit {
+function corsHeaders(request: Request, env: Env): HeadersInit {
+  const requestOrigin = request.headers.get('origin') ?? '';
+  const siteOrigin = env.SITE_ORIGIN ?? 'https://whatweplayin.gg';
+  const allowedOrigins = new Set([
+    siteOrigin,
+    'http://localhost:4321', // astro dev
+    'http://localhost:3000',
+  ]);
+  const allowOrigin = allowedOrigins.has(requestOrigin) ? requestOrigin : siteOrigin;
   return {
-    'access-control-allow-origin': '*',
-    'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'access-control-allow-origin': allowOrigin,
+    'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'access-control-allow-headers': 'content-type, x-group-secret',
     'access-control-allow-credentials': 'true',
     'access-control-max-age': '86400',
+    vary: 'origin',
   };
 }
 
-function withCors(res: Response): Response {
+function withCors(res: Response, request: Request, env: Env): Response {
   const headers = new Headers(res.headers);
-  for (const [k, v] of Object.entries(corsHeaders())) headers.set(k, v as string);
+  for (const [k, v] of Object.entries(corsHeaders(request, env))) headers.set(k, v as string);
   return new Response(res.body, { status: res.status, headers });
 }

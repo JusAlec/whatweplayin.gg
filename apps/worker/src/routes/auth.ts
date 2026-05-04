@@ -81,17 +81,19 @@ export async function dispatchAuth(ctx: AuthCtx): Promise<Response | null> {
     return new Response(null, {
       status: 302,
       headers: {
-        location: '/who',
-        'set-cookie': sessionCookie(sessionId),
+        location: `${baseUrl}/who`,
+        'set-cookie': sessionCookie(sessionId, cookieOpts(env)),
       },
     });
   }
 
   // GET /api/auth/login/steam → redirect to Steam OpenID
   if (sub[0] === 'login' && sub[1] === 'steam' && request.method === 'GET') {
+    const url = new URL(request.url);
+    const apiOrigin = `${url.protocol}//${url.host}`;
     const loginUrl = buildSteamLoginUrl({
-      realm: baseUrl,
-      returnTo: `${baseUrl}/api/auth/callback/steam`,
+      realm: apiOrigin,
+      returnTo: `${apiOrigin}/api/auth/callback/steam`,
     });
     return new Response(null, { status: 302, headers: { location: loginUrl } });
   }
@@ -139,8 +141,8 @@ export async function dispatchAuth(ctx: AuthCtx): Promise<Response | null> {
     return new Response(null, {
       status: 302,
       headers: {
-        location: '/who',
-        'set-cookie': sessionCookie(sessionId),
+        location: `${baseUrl}/who`,
+        'set-cookie': sessionCookie(sessionId, cookieOpts(env)),
       },
     });
   }
@@ -151,7 +153,7 @@ export async function dispatchAuth(ctx: AuthCtx): Promise<Response | null> {
       status: 200,
       headers: {
         'content-type': 'application/json',
-        'set-cookie': clearSessionCookie(),
+        'set-cookie': clearSessionCookie(cookieOpts(env)),
       },
     });
   }
@@ -176,4 +178,8 @@ function json(body: unknown, status = 200): Response {
 
 function badRequest(msg: string): Response {
   return json({ error: msg }, 400);
+}
+
+function cookieOpts(env: Env): { domain?: string } | undefined {
+  return env.SESSION_COOKIE_DOMAIN ? { domain: env.SESSION_COOKIE_DOMAIN } : undefined;
 }
