@@ -201,14 +201,14 @@ export default function WhosPlayingMinimal() {
       )}
 
       <section>
-        <header className="mb-2 flex items-center justify-between">
+        <header className="mb-2 flex items-center gap-1">
           <h2 className="text-lg font-medium">Your groups</h2>
           <button
             type="button"
             onClick={() => (addMode === 'idle' ? setAddMode('create') : resetAdd())}
             aria-label={addMode === 'idle' ? 'Add a group' : 'Close'}
             title={addMode === 'idle' ? 'Add a group' : 'Close'}
-            className="rounded p-2 text-muted transition hover:bg-panel hover:text-text"
+            className="rounded p-1.5 text-muted transition hover:bg-panel hover:text-text"
           >
             {addMode === 'idle' ? <PlusIcon /> : <CloseIcon />}
           </button>
@@ -255,9 +255,11 @@ export default function WhosPlayingMinimal() {
                 <button
                   type="submit"
                   disabled={busy || !createName.trim()}
-                  className="shrink-0 rounded bg-accent px-4 py-2 text-white disabled:opacity-60"
+                  aria-label="Create group"
+                  title="Create group"
+                  className="shrink-0 rounded bg-accent p-2 text-white disabled:opacity-60"
                 >
-                  Create
+                  <PlusIcon />
                 </button>
               </form>
             ) : (
@@ -266,7 +268,7 @@ export default function WhosPlayingMinimal() {
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value)}
                   placeholder="Invite code"
-                  className="min-w-0 flex-1 rounded border border-border bg-bg px-3 py-2 font-mono"
+                  className="min-w-0 flex-1 rounded border border-border bg-bg px-3 py-2"
                   disabled={busy}
                   autoFocus
                   key="join-input"
@@ -274,9 +276,11 @@ export default function WhosPlayingMinimal() {
                 <button
                   type="submit"
                   disabled={busy || !joinCode.trim()}
-                  className="shrink-0 rounded bg-accent px-4 py-2 text-white disabled:opacity-60"
+                  aria-label="Join group"
+                  title="Join group"
+                  className="shrink-0 rounded bg-accent p-2 text-white disabled:opacity-60"
                 >
-                  Join
+                  <PlusIcon />
                 </button>
               </form>
             )}
