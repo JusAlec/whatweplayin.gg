@@ -41,6 +41,23 @@ interface RecommendationsResp {
   coldStart: boolean;
 }
 
+interface LibraryEntry {
+  game: GameSummary;
+  ownerCount: number;
+  yourVote: -1 | 0 | 1;
+  thumbs: { up: number; down: number };
+}
+
+interface LibraryResp {
+  games: LibraryEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+const LIBRARY_PAGE_SIZE = 24;
+type LibraryFilter = 'all' | 'coop' | 'pvp' | 'single';
+
 export default function GroupHomeMinimal({ gid }: Props) {
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<MemberWithUser[]>([]);
@@ -49,6 +66,10 @@ export default function GroupHomeMinimal({ gid }: Props) {
   const [busy, setBusy] = useState(false);
   const [recs, setRecs] = useState<RecommendationsResp | null>(null);
   const [recsBusy, setRecsBusy] = useState(false);
+  const [library, setLibrary] = useState<LibraryResp | null>(null);
+  const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>('all');
+  const [librarySearchInput, setLibrarySearchInput] = useState('');
+  const [librarySearchActive, setLibrarySearchActive] = useState('');
   const { flags: featureFlags } = useConfig();
 
   async function load() {
@@ -94,6 +115,27 @@ export default function GroupHomeMinimal({ gid }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featureFlags.recommendations, group]);
+
+  async function loadLibrary(opts: { offset?: number; filter?: LibraryFilter; q?: string } = {}) {
+    const params = new URLSearchParams({
+      limit: String(LIBRARY_PAGE_SIZE),
+      offset: String(opts.offset ?? 0),
+      filter: opts.filter ?? libraryFilter,
+    });
+    const q = opts.q ?? librarySearchActive;
+    if (q) params.set('q', q);
+    try {
+      const r = await api.get<LibraryResp>(`/api/groups/${gid}/library?${params}`);
+      setLibrary(r);
+    } catch (err) {
+      console.error('library fetch failed:', err);
+    }
+  }
+
+  useEffect(() => {
+    if (group) void loadLibrary({ offset: 0, filter: libraryFilter, q: librarySearchActive });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group, libraryFilter, librarySearchActive]);
 
   async function createInvite() {
     setBusy(true);
@@ -225,6 +267,70 @@ export default function GroupHomeMinimal({ gid }: Props) {
           )}
         </section>
       )}
+
+      <section>
+        <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-medium">Browse library</h2>
+          <div className="flex flex-wrap gap-2">
+            {(['all', 'coop', 'pvp', 'single'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setLibraryFilter(f)}
+                className={`rounded border px-3 py-1 text-xs transition ${
+                  libraryFilter === f
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-border text-muted hover:border-accent hover:text-accent'
+                }`}
+              >
+                {f === 'all' ? 'All' : f === 'coop' ? 'Co-op' : f === 'pvp' ? 'PvP' : 'Single'}
+              </button>
+            ))}
+            <input
+              value={librarySearchInput}
+              onChange={(e) => setLibrarySearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setLibrarySearchActive(librarySearchInput);
+              }}
+              placeholder="Search…"
+              className="rounded border border-border bg-panel px-2 py-1 text-xs"
+            />
+          </div>
+        </header>
+        {library === null ? (
+          <p className="text-muted text-sm">Loading library…</p>
+        ) : library.games.length === 0 ? (
+          <p className="text-muted text-sm">No games match.</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {library.games.map((entry) => (
+                <GameCard
+                  key={entry.game.id}
+                  game={entry.game}
+                  groupId={gid}
+                  ownerCount={entry.ownerCount}
+                  groupSize={members.length}
+                  thumbs={entry.thumbs}
+                  yourVote={entry.yourVote}
+                  showThumbs={featureFlags.thumbs}
+                  showRating={featureFlags.steamRatings}
+                />
+              ))}
+            </div>
+            {library.offset + library.games.length < library.total && (
+              <button
+                onClick={() => {
+                  const newOffset = library.offset + library.limit;
+                  void loadLibrary({ offset: newOffset });
+                }}
+                className="mt-4 w-full rounded border border-border py-2 text-sm text-muted hover:border-accent hover:text-accent"
+              >
+                Load more ({library.total - library.offset - library.games.length} remaining)
+              </button>
+            )}
+          </>
+        )}
+      </section>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
