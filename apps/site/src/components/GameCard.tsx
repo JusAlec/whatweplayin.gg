@@ -75,7 +75,7 @@ export default function GameCard({
   }
 
   return (
-    <div className="flex w-48 shrink-0 flex-col gap-2 rounded border border-border bg-panel p-2">
+    <div className="flex h-full w-full flex-col gap-2 rounded border border-border bg-panel p-2">
       <div className="aspect-video w-full overflow-hidden rounded bg-bg">
         {notEnriched || !game.coverUrl ? (
           <div className="flex h-full w-full items-center justify-center text-xs text-muted">
