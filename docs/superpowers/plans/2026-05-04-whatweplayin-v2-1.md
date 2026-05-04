@@ -19,11 +19,13 @@
 ### Task 1: D1 migration 0005
 
 **Files:**
+
 - Create: `apps/worker/migrations/0005_v21_thumbs_and_steam_reviews.sql`
 
 - [ ] **Step 1: Write the migration**
 
 `apps/worker/migrations/0005_v21_thumbs_and_steam_reviews.sql`:
+
 ```sql
 -- v2.1: thumbs voting + Steam review metadata + per-user library sync timestamp
 
@@ -53,6 +55,7 @@ ALTER TABLE users ADD COLUMN steam_library_synced_at TEXT;
 - [ ] **Step 2: Verify migration parses (sqlite3 syntax check)**
 
 Run:
+
 ```bash
 cd /c/QR8/gamenight-os && sqlite3 :memory: < apps/worker/migrations/0005_v21_thumbs_and_steam_reviews.sql && echo "ok"
 ```
@@ -64,6 +67,7 @@ Expected: `ok` (no syntax errors).
 The vitest config auto-discovers all migrations and applies them per-test. Adding a new migration just works.
 
 Run:
+
 ```bash
 cd /c/QR8/gamenight-os && BETTER_AUTH_SECRET=test npx pnpm@9.15.4 --filter @wwp/worker test 2>&1 | tail -5
 ```
@@ -82,6 +86,7 @@ git commit -m "feat(d1): migration 0005 — thumbs + Steam review fields + steam
 ### Task 2: Extend `@wwp/auth-shared` types
 
 **Files:**
+
 - Modify: `packages/auth-shared/src/types.ts`
 
 - [ ] **Step 1: Read the file to understand current shape**
@@ -114,9 +119,9 @@ export type GameFlag = 'cold-start' | 'low-confidence' | 'not-enriched' | 'never
  * NULL when enrichment hasn't run for that game.
  */
 export interface GameV21 extends Game {
-  steamReviewScore: number | null;          // 0..9, Steam's enum
-  steamReviewScoreDesc: string | null;      // e.g. "Very Positive"
-  steamReviewPctPositive: number | null;    // 0..100
+  steamReviewScore: number | null; // 0..9, Steam's enum
+  steamReviewScoreDesc: string | null; // e.g. "Very Positive"
+  steamReviewPctPositive: number | null; // 0..100
   steamReviewCount: number | null;
 }
 
@@ -153,8 +158,8 @@ export interface LibraryEntry {
   ownerCount: number;
   yourVote: -1 | 0 | 1;
   thumbs: { up: number; down: number };
-  yourPlaytime: number | null;     // minutes, null if requesting user doesn't own
-  yourLastPlayed: string | null;   // ISO timestamp, null if never played by requester
+  yourPlaytime: number | null; // minutes, null if requesting user doesn't own
+  yourLastPlayed: string | null; // ISO timestamp, null if never played by requester
 }
 
 export interface LibraryResponse {
@@ -208,6 +213,7 @@ export interface User {
 - [ ] **Step 4: Verify types compile**
 
 Run:
+
 ```bash
 cd /c/QR8/gamenight-os && npx pnpm@9.15.4 --filter @wwp/auth-shared typecheck 2>&1 | tail -5
 ```
@@ -234,6 +240,7 @@ git commit -m "feat(auth-shared): v2.1 types — Thumb, GameFlag, EnrichedGame, 
 ### Task 3: Extend Db client wrapper
 
 **Files:**
+
 - Modify: `apps/worker/src/lib/d1-client.ts`
 - Test: `apps/worker/tests/d1-client.test.ts` (existing)
 
@@ -260,6 +267,7 @@ function rowToUser(r: Record<string, unknown>): User {
 ```
 
 Add to the returned object:
+
 ```ts
     steamLibrarySyncedAt: (r.steam_library_synced_at as string | null) ?? null,
 ```
@@ -269,6 +277,7 @@ Add to the returned object:
 The insert function currently constructs an INSERT statement on the `users` table. Update it to bind `steam_library_synced_at` as well — but since it defaults to NULL on row creation, the simplest approach is to leave the INSERT unchanged (column not listed → NULL by default) and just expose a separate update method:
 
 Add to the `users` accessor:
+
 ```ts
 async setSteamLibrarySyncedAt(userId: string, syncedAt: string): Promise<void> {
   await this.db
@@ -281,6 +290,7 @@ async setSteamLibrarySyncedAt(userId: string, syncedAt: string): Promise<void> {
 - [ ] **Step 4: Update Game row mapping for the new review columns**
 
 Find the games accessor (or row mapping). Add to the rowToGame function:
+
 ```ts
     steamReviewScore: (r.steam_review_score as number | null) ?? null,
     steamReviewScoreDesc: (r.steam_review_score_desc as string | null) ?? null,
@@ -295,54 +305,56 @@ If a games accessor doesn't yet exist in d1-client.ts (catalog access has been r
 Append a new section inside the `Db` class:
 
 ```ts
-  thumbs = {
-    async upsert(
-      groupId: string,
-      userId: string,
-      gameId: string,
-      vote: -1 | 1,
-    ): Promise<{ vote: -1 | 1; votedAt: string }> {
-      const votedAt = new Date().toISOString();
-      await this.db
-        .prepare(
-          `INSERT INTO thumbs (group_id, user_id, game_id, vote, voted_at)
+thumbs = {
+  async upsert(
+    groupId: string,
+    userId: string,
+    gameId: string,
+    vote: -1 | 1,
+  ): Promise<{ vote: -1 | 1; votedAt: string }> {
+    const votedAt = new Date().toISOString();
+    await this.db
+      .prepare(
+        `INSERT INTO thumbs (group_id, user_id, game_id, vote, voted_at)
            VALUES (?, ?, ?, ?, ?)
            ON CONFLICT (group_id, user_id, game_id) DO UPDATE
               SET vote = excluded.vote, voted_at = excluded.voted_at`,
-        )
-        .bind(groupId, userId, gameId, vote, votedAt)
-        .run();
-      return { vote, votedAt };
-    },
+      )
+      .bind(groupId, userId, gameId, vote, votedAt)
+      .run();
+    return { vote, votedAt };
+  },
 
-    async delete(groupId: string, userId: string, gameId: string): Promise<void> {
-      await this.db
-        .prepare('DELETE FROM thumbs WHERE group_id = ? AND user_id = ? AND game_id = ?')
-        .bind(groupId, userId, gameId)
-        .run();
-    },
+  async delete(groupId: string, userId: string, gameId: string): Promise<void> {
+    await this.db
+      .prepare('DELETE FROM thumbs WHERE group_id = ? AND user_id = ? AND game_id = ?')
+      .bind(groupId, userId, gameId)
+      .run();
+  },
 
-    async listByGroup(groupId: string): Promise<Array<{ userId: string; gameId: string; vote: -1 | 1; votedAt: string }>> {
-      const result = await this.db
-        .prepare('SELECT user_id, game_id, vote, voted_at FROM thumbs WHERE group_id = ?')
-        .bind(groupId)
-        .all();
-      return (result.results as Record<string, unknown>[]).map((r) => ({
-        userId: r.user_id as string,
-        gameId: r.game_id as string,
-        vote: r.vote as -1 | 1,
-        votedAt: r.voted_at as string,
-      }));
-    },
+  async listByGroup(
+    groupId: string,
+  ): Promise<Array<{ userId: string; gameId: string; vote: -1 | 1; votedAt: string }>> {
+    const result = await this.db
+      .prepare('SELECT user_id, game_id, vote, voted_at FROM thumbs WHERE group_id = ?')
+      .bind(groupId)
+      .all();
+    return (result.results as Record<string, unknown>[]).map((r) => ({
+      userId: r.user_id as string,
+      gameId: r.game_id as string,
+      vote: r.vote as -1 | 1,
+      votedAt: r.voted_at as string,
+    }));
+  },
 
-    async countForGroup(groupId: string): Promise<number> {
-      const row = await this.db
-        .prepare('SELECT COUNT(*) AS n FROM thumbs WHERE group_id = ?')
-        .bind(groupId)
-        .first();
-      return (row as { n: number }).n;
-    },
-  } satisfies Record<string, unknown>;
+  async countForGroup(groupId: string): Promise<number> {
+    const row = await this.db
+      .prepare('SELECT COUNT(*) AS n FROM thumbs WHERE group_id = ?')
+      .bind(groupId)
+      .first();
+    return (row as { n: number }).n;
+  },
+} satisfies Record<string, unknown>;
 ```
 
 NOTE: `this.db` is already the D1Database. The `satisfies` clause is illustrative; use whatever style the existing accessors use.
@@ -369,6 +381,7 @@ git commit -m "feat(worker): extend Db client — thumbs accessor + Steam review
 ### Task 4: Worker Env interface + wrangler.toml feature flags
 
 **Files:**
+
 - Modify: `apps/worker/src/index.ts`
 - Modify: `apps/worker/wrangler.toml`
 
@@ -419,6 +432,7 @@ WWP_THUMBS_DOWN_VETO_DAYS = "7"
 - [ ] **Step 3: Add a small `flags.ts` helper for consistent flag reading**
 
 Create `apps/worker/src/lib/flags.ts`:
+
 ```ts
 import type { Env } from '../index.js';
 
@@ -456,11 +470,13 @@ git commit -m "feat(worker): v2.1 feature flag plumbing — Env interface + wran
 ### Task 5: docs/feature-flags.md
 
 **Files:**
+
 - Create: `docs/feature-flags.md`
 
 - [ ] **Step 1: Write the doc**
 
 `docs/feature-flags.md`:
+
 ```markdown
 # Feature Flags
 
@@ -480,18 +496,18 @@ WhatWePlayin gates behavior behind feature flags read from `apps/worker/wrangler
 
 ## v2.1 flags
 
-| Flag | Type | Default | When ON | When OFF | Notes |
-|---|---|---|---|---|---|
-| `WWP_FEAT_AUTOSYNC_ON_LOGIN` | bool | `true` | `/api/me` triggers a `ctx.waitUntil(syncSteamLibrary)` call when the user's Steam library is older than `WWP_AUTOSYNC_STALENESS_HOURS` | autosync disabled; only initial-on-link and manual refresh remain | Flip to `false` if Steam Web API rate limits become a concern |
-| `WWP_FEAT_THUMBS` | bool | `true` | thumbs voting routes accept PUT/DELETE; UI renders thumbs buttons on cards | thumbs routes return 503; UI hides thumbs buttons | Disabling does not delete existing votes — they're just inert until re-enabled |
-| `WWP_FEAT_RECOMMENDATIONS` | bool | `true` | `/api/groups/:gid/recommendations` returns ranked picks | route returns 503; UI hides "Recommended tonight" section | The library section still works — recommendations are an additive layer |
-| `WWP_FEAT_STEAM_RATINGS` | bool | `true` | recommender uses cold-start blend with Steam % positive; UI shows "Very Positive · 12k reviews" badge on cards | cold-start blend disabled; rating badge hidden | Recommender falls back to base thumbs score during cold-start (less guidance for new groups) |
-| `WWP_AUTOSYNC_STALENESS_HOURS` | number | `6` | hours; if `users.steam_library_synced_at` is older than this, autosync fires | (n/a — tunable) | Lower = fresher data, more API calls. Higher = staler data, fewer calls. |
-| `WWP_WEIGHT_THUMBS` | number | `0.5` | recommender weight on the thumbs axis | (n/a) | Weights need not sum to 1.0 but should for sanity |
-| `WWP_WEIGHT_OWNERSHIP` | number | `0.3` | recommender weight on the ownership-prevalence axis | (n/a) | |
-| `WWP_WEIGHT_NOVELTY` | number | `0.2` | recommender weight on the novelty (recency-decay) axis | (n/a) | |
-| `WWP_RECOMMENDATIONS_LIMIT` | number | `5` | how many picks the recommender returns | (n/a) | UI's "Recommended tonight" row scrolls horizontally if > 5 |
-| `WWP_THUMBS_DOWN_VETO_DAYS` | number | `7` | days a thumb-down filters a game out of recommendations for the group | (n/a) | After veto expires, the game can return to the candidate pool |
+| Flag                           | Type   | Default | When ON                                                                                                                                | When OFF                                                          | Notes                                                                                        |
+| ------------------------------ | ------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `WWP_FEAT_AUTOSYNC_ON_LOGIN`   | bool   | `true`  | `/api/me` triggers a `ctx.waitUntil(syncSteamLibrary)` call when the user's Steam library is older than `WWP_AUTOSYNC_STALENESS_HOURS` | autosync disabled; only initial-on-link and manual refresh remain | Flip to `false` if Steam Web API rate limits become a concern                                |
+| `WWP_FEAT_THUMBS`              | bool   | `true`  | thumbs voting routes accept PUT/DELETE; UI renders thumbs buttons on cards                                                             | thumbs routes return 503; UI hides thumbs buttons                 | Disabling does not delete existing votes — they're just inert until re-enabled               |
+| `WWP_FEAT_RECOMMENDATIONS`     | bool   | `true`  | `/api/groups/:gid/recommendations` returns ranked picks                                                                                | route returns 503; UI hides "Recommended tonight" section         | The library section still works — recommendations are an additive layer                      |
+| `WWP_FEAT_STEAM_RATINGS`       | bool   | `true`  | recommender uses cold-start blend with Steam % positive; UI shows "Very Positive · 12k reviews" badge on cards                         | cold-start blend disabled; rating badge hidden                    | Recommender falls back to base thumbs score during cold-start (less guidance for new groups) |
+| `WWP_AUTOSYNC_STALENESS_HOURS` | number | `6`     | hours; if `users.steam_library_synced_at` is older than this, autosync fires                                                           | (n/a — tunable)                                                   | Lower = fresher data, more API calls. Higher = staler data, fewer calls.                     |
+| `WWP_WEIGHT_THUMBS`            | number | `0.5`   | recommender weight on the thumbs axis                                                                                                  | (n/a)                                                             | Weights need not sum to 1.0 but should for sanity                                            |
+| `WWP_WEIGHT_OWNERSHIP`         | number | `0.3`   | recommender weight on the ownership-prevalence axis                                                                                    | (n/a)                                                             |                                                                                              |
+| `WWP_WEIGHT_NOVELTY`           | number | `0.2`   | recommender weight on the novelty (recency-decay) axis                                                                                 | (n/a)                                                             |                                                                                              |
+| `WWP_RECOMMENDATIONS_LIMIT`    | number | `5`     | how many picks the recommender returns                                                                                                 | (n/a)                                                             | UI's "Recommended tonight" row scrolls horizontally if > 5                                   |
+| `WWP_THUMBS_DOWN_VETO_DAYS`    | number | `7`     | days a thumb-down filters a game out of recommendations for the group                                                                  | (n/a)                                                             | After veto expires, the game can return to the candidate pool                                |
 
 ## Adding a new flag
 
@@ -516,6 +532,7 @@ git commit -m "docs: feature flag inventory + conventions"
 ### Task 6: GET /api/config route
 
 **Files:**
+
 - Create: `apps/worker/src/routes/config.ts`
 - Create: `apps/worker/tests/config-route.test.ts`
 - Modify: `apps/worker/src/index.ts` (dispatch)
@@ -523,6 +540,7 @@ git commit -m "docs: feature flag inventory + conventions"
 - [ ] **Step 1: Write the test first**
 
 `apps/worker/tests/config-route.test.ts`:
+
 ```ts
 import { test, expect, describe } from 'vitest';
 // @ts-expect-error - cloudflare:test is provided by @cloudflare/vitest-pool-workers
@@ -568,6 +586,7 @@ Expected: 404 returned (test asserts 200) → both tests fail.
 - [ ] **Step 3: Implement the route**
 
 `apps/worker/src/routes/config.ts`:
+
 ```ts
 import { flagOn } from '../lib/flags.js';
 import type { Env } from '../index.js';
@@ -606,11 +625,13 @@ export async function dispatchConfig(ctx: RouteCtx): Promise<Response | null> {
 - [ ] **Step 4: Wire dispatcher into `apps/worker/src/index.ts`**
 
 Add the import at the top:
+
 ```ts
 import { dispatchConfig } from './routes/config.js';
 ```
 
 Inside the `if (parts[0] === 'api')` block, immediately after the auth dispatcher (or wherever the v2.0 routes are dispatched), add:
+
 ```ts
 const configResp = await dispatchConfig({ request, env, parts: apiParts });
 if (configResp) return withCors(configResp, request, env);
@@ -646,31 +667,39 @@ git commit -m "feat(worker): add GET /api/config — surface feature flags to si
 ### Task 7: getOwnedGames helper
 
 **Files:**
+
 - Create: `apps/worker/src/lib/steam-api.ts`
 - Create: `apps/worker/tests/steam-api.test.ts`
 
 - [ ] **Step 1: Write the test first**
 
 `apps/worker/tests/steam-api.test.ts`:
+
 ```ts
 import { test, expect, describe, vi } from 'vitest';
 import { getOwnedGames, SteamPrivateProfileError } from '../src/lib/steam-api.js';
 
 describe('getOwnedGames', () => {
   test('returns parsed games array on success', async () => {
-    const fakeFetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          response: {
-            game_count: 2,
-            games: [
-              { appid: 730, name: 'CS2', playtime_forever: 1234, rtime_last_played: 1700000000 },
-              { appid: 892970, name: 'Valheim', playtime_forever: 567, rtime_last_played: 1710000000 },
-            ],
-          },
-        }),
-        { status: 200 },
-      ),
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            response: {
+              game_count: 2,
+              games: [
+                { appid: 730, name: 'CS2', playtime_forever: 1234, rtime_last_played: 1700000000 },
+                {
+                  appid: 892970,
+                  name: 'Valheim',
+                  playtime_forever: 567,
+                  rtime_last_played: 1710000000,
+                },
+              ],
+            },
+          }),
+          { status: 200 },
+        ),
     );
     const result = await getOwnedGames('apikey', '76561198000000001', fakeFetch as typeof fetch);
     expect(result).toHaveLength(2);
@@ -683,8 +712,8 @@ describe('getOwnedGames', () => {
   });
 
   test('throws SteamPrivateProfileError when response has no games key', async () => {
-    const fakeFetch = vi.fn(async () =>
-      new Response(JSON.stringify({ response: {} }), { status: 200 }),
+    const fakeFetch = vi.fn(
+      async () => new Response(JSON.stringify({ response: {} }), { status: 200 }),
     );
     await expect(
       getOwnedGames('apikey', '76561198000000001', fakeFetch as typeof fetch),
@@ -699,8 +728,9 @@ describe('getOwnedGames', () => {
   });
 
   test('builds correct URL with key, steamid, include_played_free_games', async () => {
-    const fakeFetch = vi.fn(async (url: string) =>
-      new Response(JSON.stringify({ response: { game_count: 0, games: [] } }), { status: 200 }),
+    const fakeFetch = vi.fn(
+      async (url: string) =>
+        new Response(JSON.stringify({ response: { game_count: 0, games: [] } }), { status: 200 }),
     );
     await getOwnedGames('mykey', '76561198000000001', fakeFetch as typeof fetch);
     const calledUrl = fakeFetch.mock.calls[0]![0] as string;
@@ -723,6 +753,7 @@ Expected: import-error (file doesn't exist).
 - [ ] **Step 3: Implement the helper**
 
 `apps/worker/src/lib/steam-api.ts`:
+
 ```ts
 const STEAM_OWNED_GAMES_URL = 'https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/';
 
@@ -736,7 +767,7 @@ export class SteamPrivateProfileError extends Error {
 export interface OwnedGame {
   appid: number;
   name: string;
-  playtimeForever: number;        // minutes
+  playtimeForever: number; // minutes
   rtimeLastPlayed: number | null; // unix seconds; 0 means never played → we coerce to null
 }
 
@@ -801,6 +832,7 @@ git commit -m "feat(worker): add Steam Web API getOwnedGames helper + SteamPriva
 ### Task 8: Steam Store API helpers (appdetails + appreviews)
 
 **Files:**
+
 - Modify: `apps/worker/src/lib/steam-api.ts`
 - Modify: `apps/worker/tests/steam-api.test.ts`
 
@@ -811,26 +843,27 @@ import { fetchAppDetails, fetchAppReviews } from '../src/lib/steam-api.js';
 
 describe('fetchAppDetails', () => {
   test('parses categories, type, header_image for a game', async () => {
-    const fakeFetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          '730': {
-            success: true,
-            data: {
-              type: 'game',
-              name: 'Counter-Strike 2',
-              header_image: 'https://cdn.akamai.steamstatic.com/steam/apps/730/header.jpg',
-              categories: [
-                { id: 1, description: 'Multi-player' },
-                { id: 49, description: 'PvP' },
-                { id: 36, description: 'Online PvP' },
-              ],
-              release_date: { coming_soon: false, date: '21 Aug, 2012' },
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            '730': {
+              success: true,
+              data: {
+                type: 'game',
+                name: 'Counter-Strike 2',
+                header_image: 'https://cdn.akamai.steamstatic.com/steam/apps/730/header.jpg',
+                categories: [
+                  { id: 1, description: 'Multi-player' },
+                  { id: 49, description: 'PvP' },
+                  { id: 36, description: 'Online PvP' },
+                ],
+                release_date: { coming_soon: false, date: '21 Aug, 2012' },
+              },
             },
-          },
-        }),
-        { status: 200 },
-      ),
+          }),
+          { status: 200 },
+        ),
     );
     const result = await fetchAppDetails(730, fakeFetch as typeof fetch);
     expect(result).not.toBeNull();
@@ -843,50 +876,52 @@ describe('fetchAppDetails', () => {
   });
 
   test('returns null when type is not game (DLC, soundtrack)', async () => {
-    const fakeFetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          '12345': {
-            success: true,
-            data: { type: 'dlc', name: 'Some DLC', header_image: '', categories: [] },
-          },
-        }),
-        { status: 200 },
-      ),
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            '12345': {
+              success: true,
+              data: { type: 'dlc', name: 'Some DLC', header_image: '', categories: [] },
+            },
+          }),
+          { status: 200 },
+        ),
     );
     const result = await fetchAppDetails(12345, fakeFetch as typeof fetch);
     expect(result).toBeNull();
   });
 
   test('returns null when success is false', async () => {
-    const fakeFetch = vi.fn(async () =>
-      new Response(JSON.stringify({ '99999': { success: false } }), { status: 200 }),
+    const fakeFetch = vi.fn(
+      async () => new Response(JSON.stringify({ '99999': { success: false } }), { status: 200 }),
     );
     const result = await fetchAppDetails(99999, fakeFetch as typeof fetch);
     expect(result).toBeNull();
   });
 
   test('detects co-op categories', async () => {
-    const fakeFetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          '892970': {
-            success: true,
-            data: {
-              type: 'game',
-              name: 'Valheim',
-              header_image: '',
-              categories: [
-                { id: 1, description: 'Multi-player' },
-                { id: 9, description: 'Co-op' },
-                { id: 38, description: 'Online Co-op' },
-                { id: 2, description: 'Single-player' },
-              ],
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            '892970': {
+              success: true,
+              data: {
+                type: 'game',
+                name: 'Valheim',
+                header_image: '',
+                categories: [
+                  { id: 1, description: 'Multi-player' },
+                  { id: 9, description: 'Co-op' },
+                  { id: 38, description: 'Online Co-op' },
+                  { id: 2, description: 'Single-player' },
+                ],
+              },
             },
-          },
-        }),
-        { status: 200 },
-      ),
+          }),
+          { status: 200 },
+        ),
     );
     const result = await fetchAppDetails(892970, fakeFetch as typeof fetch);
     expect(result!.hasCoop).toBe(true);
@@ -897,19 +932,20 @@ describe('fetchAppDetails', () => {
 
 describe('fetchAppReviews', () => {
   test('parses query_summary into review fields', async () => {
-    const fakeFetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          success: 1,
-          query_summary: {
-            review_score: 9,
-            review_score_desc: 'Overwhelmingly Positive',
-            total_positive: 950000,
-            total_reviews: 1000000,
-          },
-        }),
-        { status: 200 },
-      ),
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: 1,
+            query_summary: {
+              review_score: 9,
+              review_score_desc: 'Overwhelmingly Positive',
+              total_positive: 950000,
+              total_reviews: 1000000,
+            },
+          }),
+          { status: 200 },
+        ),
     );
     const result = await fetchAppReviews(730, fakeFetch as typeof fetch);
     expect(result).toEqual({
@@ -921,19 +957,20 @@ describe('fetchAppReviews', () => {
   });
 
   test('returns null when total_reviews is 0 (no reviews)', async () => {
-    const fakeFetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          success: 1,
-          query_summary: {
-            review_score: 0,
-            review_score_desc: 'No user reviews',
-            total_positive: 0,
-            total_reviews: 0,
-          },
-        }),
-        { status: 200 },
-      ),
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: 1,
+            query_summary: {
+              review_score: 0,
+              review_score_desc: 'No user reviews',
+              total_positive: 0,
+              total_reviews: 0,
+            },
+          }),
+          { status: 200 },
+        ),
     );
     const result = await fetchAppReviews(99999, fakeFetch as typeof fetch);
     expect(result).toBeNull();
@@ -1019,10 +1056,10 @@ export async function fetchAppDetails(
 }
 
 export interface AppReviews {
-  score: number;          // 0..9 (Steam's enum)
-  scoreDesc: string;      // e.g. "Very Positive"
-  pctPositive: number;    // 0..100, derived from total_positive / total_reviews
-  count: number;          // total_reviews
+  score: number; // 0..9 (Steam's enum)
+  scoreDesc: string; // e.g. "Very Positive"
+  pctPositive: number; // 0..100, derived from total_positive / total_reviews
+  count: number; // total_reviews
 }
 
 interface AppReviewsRaw {
@@ -1048,7 +1085,7 @@ export async function fetchAppReviews(
   const s = json.query_summary;
   if (!s || !s.total_reviews || s.total_reviews === 0) return null;
 
-  const pct = Math.round((s.total_positive ?? 0) / s.total_reviews * 100);
+  const pct = Math.round(((s.total_positive ?? 0) / s.total_reviews) * 100);
   return {
     score: s.review_score ?? 0,
     scoreDesc: s.review_score_desc ?? '',
@@ -1078,6 +1115,7 @@ git commit -m "feat(worker): add Steam Store API helpers — appdetails + apprev
 ### Task 9: Skipped-appid in-memory cache helper
 
 **Files:**
+
 - Modify: `apps/worker/src/lib/steam-api.ts`
 
 - [ ] **Step 1: Append a skipped-appid cache module**
@@ -1085,10 +1123,13 @@ git commit -m "feat(worker): add Steam Store API helpers — appdetails + apprev
 This cache prevents re-fetching `appdetails` for appids that have already been determined to NOT be games (DLC/soundtrack/video). Per-isolate, best-effort, expires after 24h.
 
 Append to `apps/worker/src/lib/steam-api.ts`:
+
 ```ts
 const SKIPPED_APPID_TTL_MS = 24 * 60 * 60 * 1000;
 
-interface SkippedEntry { until: number }
+interface SkippedEntry {
+  until: number;
+}
 
 const skippedAppIds = new Map<number, SkippedEntry>();
 
@@ -1115,6 +1156,7 @@ export function __resetSkippedAppIdsForTesting(): void {
 - [ ] **Step 2: Append tests for the cache**
 
 In `apps/worker/tests/steam-api.test.ts`:
+
 ```ts
 import {
   isAppidSkipped,
@@ -1149,6 +1191,7 @@ describe('skipped appid cache', () => {
 ```
 
 Add `beforeEach` to the imports at the top of the test file if not already there:
+
 ```ts
 import { test, expect, describe, vi, beforeEach } from 'vitest';
 ```
@@ -1175,12 +1218,14 @@ git commit -m "feat(worker): add in-memory skipped-appid cache (24h TTL)"
 ### Task 10: syncSteamLibrary — happy path (ownership only, no enrichment yet)
 
 **Files:**
+
 - Create: `apps/worker/src/lib/steam-sync.ts`
 - Create: `apps/worker/tests/steam-sync.test.ts`
 
 - [ ] **Step 1: Write the test first**
 
 `apps/worker/tests/steam-sync.test.ts`:
+
 ```ts
 import { test, expect, describe, beforeEach, vi } from 'vitest';
 // @ts-expect-error - cloudflare:test is provided by @cloudflare/vitest-pool-workers
@@ -1223,7 +1268,12 @@ describe('syncSteamLibrary — ownership upserts', () => {
               game_count: 2,
               games: [
                 { appid: 730, name: 'CS2', playtime_forever: 1234, rtime_last_played: 1700000000 },
-                { appid: 892970, name: 'Valheim', playtime_forever: 567, rtime_last_played: 1710000000 },
+                {
+                  appid: 892970,
+                  name: 'Valheim',
+                  playtime_forever: 567,
+                  rtime_last_played: 1710000000,
+                },
               ],
             },
           }),
@@ -1240,16 +1290,18 @@ describe('syncSteamLibrary — ownership upserts', () => {
 
     expect(result.gamesUpdated + result.gamesAdded).toBeGreaterThanOrEqual(0);
 
-    const ownership = await env.DB
-      .prepare('SELECT game_id, playtime_minutes FROM game_ownership WHERE user_id = ?')
+    const ownership = await env.DB.prepare(
+      'SELECT game_id, playtime_minutes FROM game_ownership WHERE user_id = ?',
+    )
       .bind('u1')
       .all();
     expect(ownership.results.length).toBe(2);
   });
 
   test('updates users.steam_library_synced_at to NOW', async () => {
-    const fakeFetch = vi.fn(async () =>
-      new Response(JSON.stringify({ response: { game_count: 0, games: [] } }), { status: 200 }),
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ response: { game_count: 0, games: [] } }), { status: 200 }),
     );
     await syncSteamLibrary(env, 'u1', '76561198000000001', {
       fetchImpl: fakeFetch as typeof fetch,
@@ -1263,8 +1315,8 @@ describe('syncSteamLibrary — ownership upserts', () => {
 
 describe('syncSteamLibrary — private profile', () => {
   test('throws SteamPrivateProfileError + still bumps synced_at', async () => {
-    const fakeFetch = vi.fn(async () =>
-      new Response(JSON.stringify({ response: {} }), { status: 200 }),
+    const fakeFetch = vi.fn(
+      async () => new Response(JSON.stringify({ response: {} }), { status: 200 }),
     );
     const { SteamPrivateProfileError } = await import('../src/lib/steam-api.js');
 
@@ -1305,19 +1357,20 @@ describe('syncSteamLibrary — removed games cleanup', () => {
     ]);
 
     // Sync returns ONLY appid 1 and 3 (game 2 has been refunded/uninstalled)
-    const fakeFetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          response: {
-            game_count: 2,
-            games: [
-              { appid: 1, name: 'G1', playtime_forever: 100, rtime_last_played: 0 },
-              { appid: 3, name: 'G3', playtime_forever: 300, rtime_last_played: 0 },
-            ],
-          },
-        }),
-        { status: 200 },
-      ),
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            response: {
+              game_count: 2,
+              games: [
+                { appid: 1, name: 'G1', playtime_forever: 100, rtime_last_played: 0 },
+                { appid: 3, name: 'G3', playtime_forever: 300, rtime_last_played: 0 },
+              ],
+            },
+          }),
+          { status: 200 },
+        ),
     );
 
     const result = await syncSteamLibrary(env, 'u1', '76561198000000001', {
@@ -1326,8 +1379,7 @@ describe('syncSteamLibrary — removed games cleanup', () => {
     });
 
     expect(result.ownershipRemoved).toBe(1);
-    const remaining = await env.DB
-      .prepare('SELECT game_id FROM game_ownership WHERE user_id = ?')
+    const remaining = await env.DB.prepare('SELECT game_id FROM game_ownership WHERE user_id = ?')
       .bind('u1')
       .all();
     const ids = remaining.results.map((r: any) => r.game_id);
@@ -1362,8 +1414,8 @@ import { Db } from './d1-client.js';
 
 export interface SyncOptions {
   fetchImpl?: typeof fetch;
-  enrichmentEnabled?: boolean;     // default true
-  enrichmentParallelism?: number;  // default 6
+  enrichmentEnabled?: boolean; // default true
+  enrichmentParallelism?: number; // default 6
 }
 
 export interface SyncResult {
@@ -1411,33 +1463,26 @@ export async function syncSteamLibrary(
     const gameId = `steam-${g.appid}`;
     // Insert game stub if not exists (so the FK from game_ownership is satisfied).
     // metadata_synced_at gets a sentinel that's invalid-looking; replaced when enrichment runs.
-    const existsRow = await env.DB
-      .prepare('SELECT 1 FROM games WHERE id = ?')
-      .bind(gameId)
-      .first();
+    const existsRow = await env.DB.prepare('SELECT 1 FROM games WHERE id = ?').bind(gameId).first();
     if (!existsRow) {
-      await env.DB
-        .prepare(
-          `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier)
+      await env.DB.prepare(
+        `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier)
                 VALUES (?, ?, ?, ?, 'auto')`,
-        )
+      )
         .bind(gameId, g.name, g.appid, '') // empty string = not-yet-enriched marker
         .run();
       gamesAdded++;
     }
 
     // Upsert ownership.
-    const lastPlayed = g.rtimeLastPlayed
-      ? new Date(g.rtimeLastPlayed * 1000).toISOString()
-      : null;
-    const upsertResult = await env.DB
-      .prepare(
-        `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, last_played_at, added_at)
+    const lastPlayed = g.rtimeLastPlayed ? new Date(g.rtimeLastPlayed * 1000).toISOString() : null;
+    const upsertResult = await env.DB.prepare(
+      `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, last_played_at, added_at)
               VALUES (?, ?, 'steam', ?, ?, ?)
          ON CONFLICT (user_id, game_id) DO UPDATE
             SET playtime_minutes = excluded.playtime_minutes,
                 last_played_at = excluded.last_played_at`,
-      )
+    )
       .bind(userId, gameId, g.playtimeForever, lastPlayed, syncedAt)
       .run();
     if (!existsRow) gamesUpdated++;
@@ -1447,11 +1492,11 @@ export async function syncSteamLibrary(
   const returnedIds = owned.map((g) => `steam-${g.appid}`);
   // SQLite bind doesn't expand arrays; build placeholder string.
   const placeholders = returnedIds.length > 0 ? returnedIds.map(() => '?').join(',') : "''";
-  const removeQuery = returnedIds.length > 0
-    ? `DELETE FROM game_ownership WHERE user_id = ? AND game_id NOT IN (${placeholders})`
-    : `DELETE FROM game_ownership WHERE user_id = ?`;
-  const removeResult = await env.DB
-    .prepare(removeQuery)
+  const removeQuery =
+    returnedIds.length > 0
+      ? `DELETE FROM game_ownership WHERE user_id = ? AND game_id NOT IN (${placeholders})`
+      : `DELETE FROM game_ownership WHERE user_id = ?`;
+  const removeResult = await env.DB.prepare(removeQuery)
     .bind(userId, ...returnedIds)
     .run();
   const ownershipRemoved = (removeResult.meta as any)?.changes ?? 0;
@@ -1497,12 +1542,14 @@ git commit -m "feat(worker): syncSteamLibrary ownership upserts + private-profil
 ### Task 11: syncSteamLibrary — enrichment with parallel fan-out
 
 **Files:**
+
 - Modify: `apps/worker/src/lib/steam-sync.ts`
 - Modify: `apps/worker/tests/steam-sync.test.ts`
 
 - [ ] **Step 1: Append enrichment tests**
 
 In `apps/worker/tests/steam-sync.test.ts`:
+
 ```ts
 describe('syncSteamLibrary — enrichment', () => {
   test('calls appdetails + appreviews for new games and updates the games row', async () => {
@@ -1579,7 +1626,9 @@ describe('syncSteamLibrary — enrichment', () => {
           JSON.stringify({
             response: {
               game_count: 1,
-              games: [{ appid: 12345, name: 'Some DLC', playtime_forever: 0, rtime_last_played: 0 }],
+              games: [
+                { appid: 12345, name: 'Some DLC', playtime_forever: 0, rtime_last_played: 0 },
+              ],
             },
           }),
           { status: 200 },
@@ -1688,12 +1737,11 @@ async function enrichNewGames(
   // Find games still un-enriched (metadata_synced_at = '' or NULL).
   if (candidateGameIds.length === 0) return 0;
   const placeholders = candidateGameIds.map(() => '?').join(',');
-  const result = await env.DB
-    .prepare(
-      `SELECT id, steam_app_id FROM games
+  const result = await env.DB.prepare(
+    `SELECT id, steam_app_id FROM games
         WHERE id IN (${placeholders})
           AND (metadata_synced_at = '' OR metadata_synced_at IS NULL)`,
-    )
+  )
     .bind(...candidateGameIds)
     .all();
   const toEnrich = result.results as Array<{ id: string; steam_app_id: number }>;
@@ -1734,11 +1782,10 @@ async function enrichOne(
 
   const now = new Date().toISOString();
   const minPlayers = 1;
-  const maxPlayers = (details.hasCoop || details.hasPvp) ? 8 : 1;
+  const maxPlayers = details.hasCoop || details.hasPvp ? 8 : 1;
 
-  await env.DB
-    .prepare(
-      `UPDATE games
+  await env.DB.prepare(
+    `UPDATE games
           SET name = ?,
               cover_url = ?,
               has_singleplayer = ?,
@@ -1753,7 +1800,7 @@ async function enrichOne(
               steam_review_pct_positive = ?,
               steam_review_count = ?
         WHERE id = ?`,
-    )
+  )
     .bind(
       details.name,
       details.headerImage,
@@ -1802,6 +1849,7 @@ git commit -m "feat(worker): syncSteamLibrary enrichment — parallel fan-out fo
 ### Task 12: Verify ownership-removed counts are accurate
 
 **Files:**
+
 - Modify: `apps/worker/src/lib/steam-sync.ts` (small fix)
 
 The `removeResult.meta.changes` may not be reliable across D1 versions. Let me verify and harden.
@@ -1809,11 +1857,13 @@ The `removeResult.meta.changes` may not be reliable across D1 versions. Let me v
 - [ ] **Step 1: Add a test that exercises the removed count more rigorously**
 
 Append to `tests/steam-sync.test.ts`:
+
 ```ts
 describe('syncSteamLibrary — ownership removed count edge cases', () => {
   test('returns 0 when no games are removed', async () => {
-    const fakeFetch = vi.fn(async () =>
-      new Response(JSON.stringify({ response: { game_count: 0, games: [] } }), { status: 200 }),
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ response: { game_count: 0, games: [] } }), { status: 200 }),
     );
     const result = await syncSteamLibrary(env, 'u1', '76561198000000001', {
       fetchImpl: fakeFetch as typeof fetch,
@@ -1833,24 +1883,27 @@ cd /c/QR8/gamenight-os && BETTER_AUTH_SECRET=test npx pnpm@9.15.4 --filter @wwp/
 If it fails because `removeResult.meta?.changes` returns undefined when nothing matches, fix by computing the count via a pre-query:
 
 In `syncSteamLibrary`:
+
 ```ts
-  // Count rows that will be removed BEFORE deletion (more reliable than D1 meta).
-  const removeCountRow = (returnedIds.length > 0
-    ? await env.DB
-        .prepare(
-          `SELECT COUNT(*) AS n FROM game_ownership
+// Count rows that will be removed BEFORE deletion (more reliable than D1 meta).
+const removeCountRow = (
+  returnedIds.length > 0
+    ? await env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM game_ownership
                   WHERE user_id = ? AND game_id NOT IN (${placeholders})`,
-        )
+      )
         .bind(userId, ...returnedIds)
         .first()
-    : await env.DB
-        .prepare('SELECT COUNT(*) AS n FROM game_ownership WHERE user_id = ?')
+    : await env.DB.prepare('SELECT COUNT(*) AS n FROM game_ownership WHERE user_id = ?')
         .bind(userId)
-        .first()) as { n: number } | null;
-  const ownershipRemoved = removeCountRow?.n ?? 0;
+        .first()
+) as { n: number } | null;
+const ownershipRemoved = removeCountRow?.n ?? 0;
 
-  // Then perform the actual delete (same query).
-  await env.DB.prepare(removeQuery).bind(userId, ...returnedIds).run();
+// Then perform the actual delete (same query).
+await env.DB.prepare(removeQuery)
+  .bind(userId, ...returnedIds)
+  .run();
 ```
 
 Replace the previous `removeResult` logic with this two-step (count then delete) approach.
@@ -1877,12 +1930,14 @@ git commit -m "fix(worker): compute ownershipRemoved via count-then-delete (D1 m
 ### Task 13: POST /api/me/sync/steam (manual refresh)
 
 **Files:**
+
 - Modify: `apps/worker/src/routes/me.ts`
 - Modify: `apps/worker/tests/me-routes.test.ts`
 
 - [ ] **Step 1: Append tests**
 
 In `apps/worker/tests/me-routes.test.ts`:
+
 ```ts
 import { vi } from 'vitest';
 
@@ -1920,37 +1975,41 @@ Expected: 2 new tests fail (route doesn't exist).
 Inside the existing `dispatchMe` function, before the final `return null`:
 
 ```ts
-  // POST /api/me/sync/steam — manual library refresh
-  if (parts.length === 3 && parts[1] === 'sync' && parts[2] === 'steam' && request.method === 'POST') {
-    const oauthRow = (await env.DB
-      .prepare(
-        'SELECT provider_user_id FROM oauth_accounts WHERE user_id = ? AND provider = ?',
-      )
-      .bind(session.user.id, 'steam')
-      .first()) as { provider_user_id?: string } | null;
-    if (!oauthRow?.provider_user_id) {
-      return jsonStatus({ error: 'no-steam-linked' }, 400);
-    }
-
-    try {
-      const { syncSteamLibrary } = await import('../lib/steam-sync.js');
-      const result = await syncSteamLibrary(env, session.user.id, oauthRow.provider_user_id);
-      return jsonStatus({ ok: true, ...result }, 200);
-    } catch (err) {
-      const { SteamPrivateProfileError } = await import('../lib/steam-api.js');
-      if (err instanceof SteamPrivateProfileError) {
-        return jsonStatus(
-          {
-            error: 'steam-private',
-            helpUrl: 'https://steamcommunity.com/my/edit/settings',
-          },
-          422,
-        );
-      }
-      console.error('manual sync failed:', err);
-      return jsonStatus({ error: 'sync-failed', message: String(err) }, 502);
-    }
+// POST /api/me/sync/steam — manual library refresh
+if (
+  parts.length === 3 &&
+  parts[1] === 'sync' &&
+  parts[2] === 'steam' &&
+  request.method === 'POST'
+) {
+  const oauthRow = (await env.DB.prepare(
+    'SELECT provider_user_id FROM oauth_accounts WHERE user_id = ? AND provider = ?',
+  )
+    .bind(session.user.id, 'steam')
+    .first()) as { provider_user_id?: string } | null;
+  if (!oauthRow?.provider_user_id) {
+    return jsonStatus({ error: 'no-steam-linked' }, 400);
   }
+
+  try {
+    const { syncSteamLibrary } = await import('../lib/steam-sync.js');
+    const result = await syncSteamLibrary(env, session.user.id, oauthRow.provider_user_id);
+    return jsonStatus({ ok: true, ...result }, 200);
+  } catch (err) {
+    const { SteamPrivateProfileError } = await import('../lib/steam-api.js');
+    if (err instanceof SteamPrivateProfileError) {
+      return jsonStatus(
+        {
+          error: 'steam-private',
+          helpUrl: 'https://steamcommunity.com/my/edit/settings',
+        },
+        422,
+      );
+    }
+    console.error('manual sync failed:', err);
+    return jsonStatus({ error: 'sync-failed', message: String(err) }, 502);
+  }
+}
 ```
 
 - [ ] **Step 4: Run tests — should pass for the gating tests**
@@ -1973,6 +2032,7 @@ git commit -m "feat(worker): add POST /api/me/sync/steam — manual Steam librar
 ### Task 14: GET /api/me — autosync via ctx.waitUntil
 
 **Files:**
+
 - Modify: `apps/worker/src/routes/me.ts`
 - Modify: `apps/worker/src/index.ts` (pass ctx through)
 
@@ -1985,6 +2045,7 @@ async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response
 ```
 
 Pass `ctx` through to `dispatchMe`:
+
 ```ts
 const meResp = await dispatchMe({ request, env, parts: apiParts, ctx });
 ```
@@ -2009,40 +2070,39 @@ Destructure `ctx` from `ctx` parameter at the function entry.
 Inside the existing `// GET /api/me` block, BEFORE the existing response is returned:
 
 ```ts
-    // Autosync if enabled + Steam linked + library is stale.
-    if (env.WWP_FEAT_AUTOSYNC_ON_LOGIN === 'true') {
-      const oauthRow = (await env.DB
-        .prepare(
-          'SELECT provider_user_id FROM oauth_accounts WHERE user_id = ? AND provider = ?',
-        )
-        .bind(session.user.id, 'steam')
-        .first()) as { provider_user_id?: string } | null;
+// Autosync if enabled + Steam linked + library is stale.
+if (env.WWP_FEAT_AUTOSYNC_ON_LOGIN === 'true') {
+  const oauthRow = (await env.DB.prepare(
+    'SELECT provider_user_id FROM oauth_accounts WHERE user_id = ? AND provider = ?',
+  )
+    .bind(session.user.id, 'steam')
+    .first()) as { provider_user_id?: string } | null;
 
-      if (oauthRow?.provider_user_id) {
-        const { readNumber } = await import('../lib/flags.js');
-        const stalenessHours = readNumber(env, 'WWP_AUTOSYNC_STALENESS_HOURS', 6);
-        const stalenessMs = stalenessHours * 60 * 60 * 1000;
-        const syncedAt = session.user.steamLibrarySyncedAt;
-        const isStale = !syncedAt || (Date.now() - new Date(syncedAt).getTime() > stalenessMs);
-        if (isStale) {
-          ctx.ctx.waitUntil(
-            (async () => {
-              const { syncSteamLibrary } = await import('../lib/steam-sync.js');
-              const { SteamPrivateProfileError } = await import('../lib/steam-api.js');
-              try {
-                await syncSteamLibrary(env, session.user.id, oauthRow.provider_user_id!);
-              } catch (err) {
-                if (err instanceof SteamPrivateProfileError) {
-                  // Already bumped synced_at internally to prevent re-fire.
-                  return;
-                }
-                console.error('autosync failed:', err);
-              }
-            })(),
-          );
-        }
-      }
+  if (oauthRow?.provider_user_id) {
+    const { readNumber } = await import('../lib/flags.js');
+    const stalenessHours = readNumber(env, 'WWP_AUTOSYNC_STALENESS_HOURS', 6);
+    const stalenessMs = stalenessHours * 60 * 60 * 1000;
+    const syncedAt = session.user.steamLibrarySyncedAt;
+    const isStale = !syncedAt || Date.now() - new Date(syncedAt).getTime() > stalenessMs;
+    if (isStale) {
+      ctx.ctx.waitUntil(
+        (async () => {
+          const { syncSteamLibrary } = await import('../lib/steam-sync.js');
+          const { SteamPrivateProfileError } = await import('../lib/steam-api.js');
+          try {
+            await syncSteamLibrary(env, session.user.id, oauthRow.provider_user_id!);
+          } catch (err) {
+            if (err instanceof SteamPrivateProfileError) {
+              // Already bumped synced_at internally to prevent re-fire.
+              return;
+            }
+            console.error('autosync failed:', err);
+          }
+        })(),
+      );
     }
+  }
+}
 ```
 
 NOTE: the `ctx.ctx.waitUntil` repetition is because the route param is `ctx: RouteCtx` and inside it `ctx.ctx` is the `ExecutionContext`. Refactor to clearer name if you prefer (e.g., destructure `const { request, env, parts, ctx: execCtx } = ctx`).
@@ -2069,12 +2129,14 @@ git commit -m "feat(worker): /api/me autosync — ctx.waitUntil(syncSteamLibrary
 ### Task 15: Steam OAuth callback blocks on initial sync (intent=link)
 
 **Files:**
+
 - Modify: `apps/worker/src/routes/auth.ts`
 - Modify: `apps/worker/src/index.ts` (pass ctx to auth dispatcher)
 
 - [ ] **Step 1: Update auth dispatcher to accept ctx**
 
 In `apps/worker/src/routes/auth.ts`, update `AuthCtx` interface:
+
 ```ts
 interface AuthCtx {
   request: Request;
@@ -2086,6 +2148,7 @@ interface AuthCtx {
 ```
 
 In `apps/worker/src/index.ts`, pass `ctx` to dispatchAuth:
+
 ```ts
 const authResp = await dispatchAuth({
   request,
@@ -2103,39 +2166,35 @@ Find the existing `if (intent === 'link') { ... }` block in `dispatchAuth`. Afte
 Replace the existing intent=link block with:
 
 ```ts
-    if (intent === 'link') {
-      const linkSession = await getSessionFromRequest(env.DB, request);
-      if (!linkSession) {
-        return new Response(null, { status: 302, headers: { location: `${baseUrl}/signin` } });
-      }
-      if (existing?.user_id && existing.user_id !== linkSession.user.id) {
-        return new Response(null, {
-          status: 302,
-          headers: { location: `${baseUrl}/who?linkError=steam-already-linked` },
-        });
-      }
-      if (!existing?.user_id) {
-        const profile = env.STEAM_API_KEY
-          ? await fetchSteamProfile(steamId, env.STEAM_API_KEY)
-          : null;
-        const now = new Date().toISOString();
-        await env.DB
-          .prepare(
-            'INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, provider_data, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-          )
-          .bind(
-            ulid(),
-            linkSession.user.id,
-            'steam',
-            steamId,
-            profile ? JSON.stringify(profile) : null,
-            now,
-          )
-          .run();
-        if (profile) {
-          await env.DB
-            .prepare(
-              `UPDATE users
+if (intent === 'link') {
+  const linkSession = await getSessionFromRequest(env.DB, request);
+  if (!linkSession) {
+    return new Response(null, { status: 302, headers: { location: `${baseUrl}/signin` } });
+  }
+  if (existing?.user_id && existing.user_id !== linkSession.user.id) {
+    return new Response(null, {
+      status: 302,
+      headers: { location: `${baseUrl}/who?linkError=steam-already-linked` },
+    });
+  }
+  if (!existing?.user_id) {
+    const profile = env.STEAM_API_KEY ? await fetchSteamProfile(steamId, env.STEAM_API_KEY) : null;
+    const now = new Date().toISOString();
+    await env.DB.prepare(
+      'INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, provider_data, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+      .bind(
+        ulid(),
+        linkSession.user.id,
+        'steam',
+        steamId,
+        profile ? JSON.stringify(profile) : null,
+        now,
+      )
+      .run();
+    if (profile) {
+      await env.DB.prepare(
+        `UPDATE users
                   SET display_name = CASE
                         WHEN email IS NOT NULL AND display_name = SUBSTR(email, 1, INSTR(email, '@') - 1)
                           THEN ?
@@ -2144,54 +2203,54 @@ Replace the existing intent=link block with:
                       avatar_url = COALESCE(avatar_url, ?),
                       updated_at = ?
                 WHERE id = ?`,
-            )
-            .bind(profile.personaname, profile.avatarfull, now, linkSession.user.id)
-            .run();
-        }
-      }
-
-      // v2.1: trigger initial Steam library sync. Block on ownership upserts (cheap),
-      // defer enrichment to ctx.waitUntil (~5-10s background).
-      try {
-        const { syncSteamLibrary } = await import('../lib/steam-sync.js');
-        const { SteamPrivateProfileError } = await import('../lib/steam-api.js');
-        try {
-          // Synchronous call: ownership upserts only. Enrichment happens in
-          // a separate background pass, kicked off below.
-          await syncSteamLibrary(env, linkSession.user.id, steamId, {
-            enrichmentEnabled: false,
-          });
-          // Background enrichment.
-          ctxParam.waitUntil(
-            (async () => {
-              try {
-                await syncSteamLibrary(env, linkSession.user.id, steamId, {
-                  enrichmentEnabled: true,
-                });
-              } catch (err) {
-                console.error('background enrichment after link failed:', err);
-              }
-            })(),
-          );
-        } catch (err) {
-          if (err instanceof SteamPrivateProfileError) {
-            return new Response(null, {
-              status: 302,
-              headers: { location: `${baseUrl}/who?linkError=steam-private` },
-            });
-          }
-          throw err;
-        }
-      } catch (err) {
-        console.error('initial sync after link failed:', err);
-        // Allow link to proceed; user can retry via /me Refresh button.
-      }
-
-      return new Response(null, {
-        status: 302,
-        headers: { location: `${baseUrl}/who?linked=steam` },
-      });
+      )
+        .bind(profile.personaname, profile.avatarfull, now, linkSession.user.id)
+        .run();
     }
+  }
+
+  // v2.1: trigger initial Steam library sync. Block on ownership upserts (cheap),
+  // defer enrichment to ctx.waitUntil (~5-10s background).
+  try {
+    const { syncSteamLibrary } = await import('../lib/steam-sync.js');
+    const { SteamPrivateProfileError } = await import('../lib/steam-api.js');
+    try {
+      // Synchronous call: ownership upserts only. Enrichment happens in
+      // a separate background pass, kicked off below.
+      await syncSteamLibrary(env, linkSession.user.id, steamId, {
+        enrichmentEnabled: false,
+      });
+      // Background enrichment.
+      ctxParam.waitUntil(
+        (async () => {
+          try {
+            await syncSteamLibrary(env, linkSession.user.id, steamId, {
+              enrichmentEnabled: true,
+            });
+          } catch (err) {
+            console.error('background enrichment after link failed:', err);
+          }
+        })(),
+      );
+    } catch (err) {
+      if (err instanceof SteamPrivateProfileError) {
+        return new Response(null, {
+          status: 302,
+          headers: { location: `${baseUrl}/who?linkError=steam-private` },
+        });
+      }
+      throw err;
+    }
+  } catch (err) {
+    console.error('initial sync after link failed:', err);
+    // Allow link to proceed; user can retry via /me Refresh button.
+  }
+
+  return new Response(null, {
+    status: 302,
+    headers: { location: `${baseUrl}/who?linked=steam` },
+  });
+}
 ```
 
 NOTE: `ctxParam` is the `ExecutionContext` passed in via `AuthCtx.ctx`. Destructure at the top of `dispatchAuth`: `const { request, env, parts, baseUrl, ctx: ctxParam } = ctx;` — adjust to match the parameter name in your file.
@@ -2222,12 +2281,14 @@ git commit -m "feat(worker): Steam Link callback now triggers initial library sy
 ### Task 16: thumbsScore unit + types
 
 **Files:**
+
 - Create: `packages/recommender/src/v2-thumbs.ts`
 - Create: `packages/recommender/tests/v2-thumbs.test.ts`
 
 - [ ] **Step 1: Write the test file**
 
 `packages/recommender/tests/v2-thumbs.test.ts`:
+
 ```ts
 import { describe, test, expect } from 'vitest';
 import { computeThumbsScore } from '../src/v2-thumbs.js';
@@ -2394,6 +2455,7 @@ git commit -m "feat(recommender): v2.1 thumbs scoring component + types"
 ### Task 17: ownershipScore + noveltyScore
 
 **Files:**
+
 - Modify: `packages/recommender/src/v2-thumbs.ts`
 - Modify: `packages/recommender/tests/v2-thumbs.test.ts`
 
@@ -2522,6 +2584,7 @@ git commit -m "feat(recommender): v2.1 ownership + novelty scoring components"
 ### Task 18: rankByThumbs integration + tiebreaker
 
 **Files:**
+
 - Modify: `packages/recommender/src/v2-thumbs.ts`
 - Modify: `packages/recommender/tests/v2-thumbs.test.ts`
 
@@ -2539,10 +2602,16 @@ describe('rankByThumbs', () => {
       group: { id: 'g1', size: 4 },
       candidates: [
         { id: 'a', name: 'Alpha', steamReviewPctPositive: 80, metadataSyncedAt: NOW.toISOString() },
-        { id: 'b', name: 'Beta',  steamReviewPctPositive: 90, metadataSyncedAt: NOW.toISOString() },
+        { id: 'b', name: 'Beta', steamReviewPctPositive: 90, metadataSyncedAt: NOW.toISOString() },
       ],
       thumbs: new Map([
-        ['a', [{ userId: 'u1', vote: 1 }, { userId: 'u2', vote: 1 }]],
+        [
+          'a',
+          [
+            { userId: 'u1', vote: 1 },
+            { userId: 'u2', vote: 1 },
+          ],
+        ],
         ['b', [{ userId: 'u1', vote: -1 }]],
       ]),
       ownership: new Map([
@@ -2586,7 +2655,7 @@ describe('rankByThumbs', () => {
       group: { id: 'g1', size: 4 },
       candidates: [
         { id: 'a', name: 'Alpha', steamReviewPctPositive: 70, metadataSyncedAt: NOW.toISOString() },
-        { id: 'b', name: 'Beta',  steamReviewPctPositive: 90, metadataSyncedAt: NOW.toISOString() },
+        { id: 'b', name: 'Beta', steamReviewPctPositive: 90, metadataSyncedAt: NOW.toISOString() },
       ],
       thumbs: new Map(),
       ownership: new Map([
@@ -2603,7 +2672,12 @@ describe('rankByThumbs', () => {
     const result = rankByThumbs({
       group: { id: 'g1', size: 4 },
       candidates: [
-        { id: 'a', name: 'Alpha', steamReviewPctPositive: null, metadataSyncedAt: NOW.toISOString() },
+        {
+          id: 'a',
+          name: 'Alpha',
+          steamReviewPctPositive: null,
+          metadataSyncedAt: NOW.toISOString(),
+        },
       ],
       thumbs: new Map(),
       ownership: new Map([['a', { ownerCount: 1, maxLastPlayed: null }]]),
@@ -2777,11 +2851,13 @@ git commit -m "feat(recommender): v2.1 rankByThumbs integration + flag emission 
 ### Task 19: Export rankByThumbs from recommender package index
 
 **Files:**
+
 - Modify: `packages/recommender/src/index.ts`
 
 - [ ] **Step 1: Add the v2 export**
 
 In `packages/recommender/src/index.ts`, append:
+
 ```ts
 export {
   rankByThumbs,
@@ -2814,6 +2890,7 @@ git commit -m "feat(recommender): export v2.1 rankByThumbs from package index"
 ### Task 20: PUT /api/groups/:gid/games/:gameId/thumb
 
 **Files:**
+
 - Create: `apps/worker/src/routes/thumbs.ts`
 - Create: `apps/worker/tests/thumbs-routes.test.ts`
 - Modify: `apps/worker/src/index.ts`
@@ -2821,6 +2898,7 @@ git commit -m "feat(recommender): export v2.1 rankByThumbs from package index"
 - [ ] **Step 1: Write tests**
 
 `apps/worker/tests/thumbs-routes.test.ts`:
+
 ```ts
 import { test, expect, describe, beforeEach } from 'vitest';
 // @ts-expect-error - cloudflare:test is provided by @cloudflare/vitest-pool-workers
@@ -2846,8 +2924,13 @@ beforeEach(async () => {
   ]);
   const now = new Date().toISOString();
   await db().users.insert({
-    id: 'u_alec', email: 'alec@test.co', emailVerified: true, displayName: 'Alec',
-    avatarUrl: null, createdAt: now, updatedAt: now,
+    id: 'u_alec',
+    email: 'alec@test.co',
+    emailVerified: true,
+    displayName: 'Alec',
+    avatarUrl: null,
+    createdAt: now,
+    updatedAt: now,
   });
   alecSession = await createSessionForUser(env.DB, 'u_alec');
 
@@ -2859,39 +2942,35 @@ beforeEach(async () => {
   groupId = ((await create.json()) as { id: string }).id;
 
   // Seed a game in catalog + ownership.
-  await env.DB
-    .prepare(
-      `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier)
+  await env.DB.prepare(
+    `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier)
             VALUES ('steam-100', 'TestGame', 100, ?, 'auto')`,
-    )
+  )
     .bind(now)
     .run();
-  await env.DB
-    .prepare(
-      `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, added_at)
+  await env.DB.prepare(
+    `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, added_at)
             VALUES ('u_alec', 'steam-100', 'steam', 50, ?)`,
-    )
+  )
     .bind(now)
     .run();
 });
 
 describe('PUT /api/groups/:gid/games/:gameId/thumb', () => {
   test('upserts a thumb-up vote', async () => {
-    const res = await SELF.fetch(
-      `https://x/api/groups/${groupId}/games/steam-100/thumb`,
-      {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSession}` },
-        body: JSON.stringify({ vote: 1 }),
-      },
-    );
+    const res = await SELF.fetch(`https://x/api/groups/${groupId}/games/steam-100/thumb`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSession}` },
+      body: JSON.stringify({ vote: 1 }),
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean; vote: number };
     expect(body.ok).toBe(true);
     expect(body.vote).toBe(1);
 
-    const row = await env.DB
-      .prepare('SELECT vote FROM thumbs WHERE group_id = ? AND user_id = ? AND game_id = ?')
+    const row = await env.DB.prepare(
+      'SELECT vote FROM thumbs WHERE group_id = ? AND user_id = ? AND game_id = ?',
+    )
       .bind(groupId, 'u_alec', 'steam-100')
       .first();
     expect((row as { vote: number }).vote).toBe(1);
@@ -2911,15 +2990,17 @@ describe('PUT /api/groups/:gid/games/:gameId/thumb', () => {
       body: JSON.stringify({ vote: -1 }),
     });
 
-    const row = await env.DB
-      .prepare('SELECT vote FROM thumbs WHERE group_id = ? AND user_id = ? AND game_id = ?')
+    const row = await env.DB.prepare(
+      'SELECT vote FROM thumbs WHERE group_id = ? AND user_id = ? AND game_id = ?',
+    )
       .bind(groupId, 'u_alec', 'steam-100')
       .first();
     expect((row as { vote: number }).vote).toBe(-1);
 
     // Only one row should exist (upsert, not append)
-    const count = await env.DB
-      .prepare('SELECT COUNT(*) AS n FROM thumbs WHERE user_id = ? AND game_id = ?')
+    const count = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM thumbs WHERE user_id = ? AND game_id = ?',
+    )
       .bind('u_alec', 'steam-100')
       .first();
     expect((count as { n: number }).n).toBe(1);
@@ -2946,8 +3027,13 @@ describe('PUT /api/groups/:gid/games/:gameId/thumb', () => {
   test('403 non-member', async () => {
     const now = new Date().toISOString();
     await db().users.insert({
-      id: 'u_x', email: 'x@test.co', emailVerified: true, displayName: 'X',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u_x',
+      email: 'x@test.co',
+      emailVerified: true,
+      displayName: 'X',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     const xSession = await createSessionForUser(env.DB, 'u_x');
     const res = await SELF.fetch(`https://x/api/groups/${groupId}/games/steam-100/thumb`, {
@@ -3017,6 +3103,7 @@ Update the test that checks 503 to set the env var to `"false"` (we'd need a tes
 - [ ] **Step 2: Implement the thumbs route**
 
 `apps/worker/src/routes/thumbs.ts`:
+
 ```ts
 import { z } from 'zod';
 import { Db } from '../lib/d1-client.js';
@@ -3048,20 +3135,20 @@ export async function dispatchThumbs(ctx: RouteCtx): Promise<Response | null> {
   const gameId = parts[3]!;
 
   // Membership check
-  const memberRow = await env.DB
-    .prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?')
+  const memberRow = await env.DB.prepare(
+    'SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?',
+  )
     .bind(gid, session.user.id)
     .first();
   if (!memberRow) return jsonStatus({ error: 'forbidden' }, 403);
 
   // Game-in-group-library check
-  const ownedRow = await env.DB
-    .prepare(
-      `SELECT 1 FROM game_ownership go
+  const ownedRow = await env.DB.prepare(
+    `SELECT 1 FROM game_ownership go
          JOIN group_members gm ON gm.user_id = go.user_id
         WHERE gm.group_id = ? AND go.game_id = ?
         LIMIT 1`,
-    )
+  )
     .bind(gid, gameId)
     .first();
   if (!ownedRow) return jsonStatus({ error: 'game-not-in-group-library' }, 404);
@@ -3086,7 +3173,11 @@ export async function dispatchThumbs(ctx: RouteCtx): Promise<Response | null> {
 }
 
 async function safeJson(req: Request): Promise<unknown> {
-  try { return await req.json(); } catch { return null; }
+  try {
+    return await req.json();
+  } catch {
+    return null;
+  }
 }
 
 function jsonStatus(body: unknown, status: number): Response {
@@ -3100,11 +3191,13 @@ function jsonStatus(body: unknown, status: number): Response {
 - [ ] **Step 3: Wire dispatcher into `apps/worker/src/index.ts`**
 
 Add import:
+
 ```ts
 import { dispatchThumbs } from './routes/thumbs.js';
 ```
 
 Inside the `/api/*` block, add (before the `return withCors(notFound, ...)` fallback):
+
 ```ts
 const thumbsResp = await dispatchThumbs({ request, env, parts: apiParts });
 if (thumbsResp) return withCors(thumbsResp, request, env);
@@ -3134,6 +3227,7 @@ git commit -m "feat(worker): PUT/DELETE /api/groups/:gid/games/:gameId/thumb"
 The DELETE branch is implemented as part of Task 20 (the `dispatchThumbs` handler also handles DELETE). Add a few more tests:
 
 **Files:**
+
 - Modify: `apps/worker/tests/thumbs-routes.test.ts`
 
 - [ ] **Step 1: Append DELETE tests**
@@ -3148,24 +3242,25 @@ describe('DELETE /api/groups/:gid/games/:gameId/thumb', () => {
       .bind(groupId, 'u_alec', 'steam-100', 1, new Date().toISOString())
       .run();
 
-    const res = await SELF.fetch(
-      `https://x/api/groups/${groupId}/games/steam-100/thumb`,
-      { method: 'DELETE', headers: { cookie: `wwp_session=${alecSession}` } },
-    );
+    const res = await SELF.fetch(`https://x/api/groups/${groupId}/games/steam-100/thumb`, {
+      method: 'DELETE',
+      headers: { cookie: `wwp_session=${alecSession}` },
+    });
     expect(res.status).toBe(200);
 
-    const row = await env.DB
-      .prepare('SELECT * FROM thumbs WHERE group_id = ? AND user_id = ? AND game_id = ?')
+    const row = await env.DB.prepare(
+      'SELECT * FROM thumbs WHERE group_id = ? AND user_id = ? AND game_id = ?',
+    )
       .bind(groupId, 'u_alec', 'steam-100')
       .first();
     expect(row).toBeNull();
   });
 
   test('idempotent: DELETE on non-existent vote returns 200', async () => {
-    const res = await SELF.fetch(
-      `https://x/api/groups/${groupId}/games/steam-100/thumb`,
-      { method: 'DELETE', headers: { cookie: `wwp_session=${alecSession}` } },
-    );
+    const res = await SELF.fetch(`https://x/api/groups/${groupId}/games/steam-100/thumb`, {
+      method: 'DELETE',
+      headers: { cookie: `wwp_session=${alecSession}` },
+    });
     expect(res.status).toBe(200);
   });
 });
@@ -3191,6 +3286,7 @@ git commit -m "test(worker): DELETE thumb route — happy path + idempotency"
 ### Task 22: GET /api/groups/:gid/library
 
 **Files:**
+
 - Create: `apps/worker/src/routes/library.ts`
 - Create: `apps/worker/tests/library-routes.test.ts`
 - Modify: `apps/worker/src/index.ts`
@@ -3198,6 +3294,7 @@ git commit -m "test(worker): DELETE thumb route — happy path + idempotency"
 - [ ] **Step 1: Write tests**
 
 `apps/worker/tests/library-routes.test.ts`:
+
 ```ts
 import { test, expect, describe, beforeEach } from 'vitest';
 // @ts-expect-error - cloudflare:test is provided by @cloudflare/vitest-pool-workers
@@ -3211,31 +3308,41 @@ let alecSession: string;
 let groupId: string;
 const NOW = new Date().toISOString();
 
-async function seedGame(id: string, name: string, opts: {
-  hasCoop?: boolean; hasPvp?: boolean; hasSingle?: boolean;
-  reviewPct?: number | null;
-} = {}) {
+async function seedGame(
+  id: string,
+  name: string,
+  opts: {
+    hasCoop?: boolean;
+    hasPvp?: boolean;
+    hasSingle?: boolean;
+    reviewPct?: number | null;
+  } = {},
+) {
   await env.DB.prepare(
     `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier,
                         has_singleplayer, has_coop, has_pvp,
                         steam_review_pct_positive)
           VALUES (?, ?, NULL, ?, 'auto', ?, ?, ?, ?)`,
-  ).bind(
-    id,
-    name,
-    NOW,
-    opts.hasSingle === false ? 0 : 1,
-    opts.hasCoop ? 1 : 0,
-    opts.hasPvp ? 1 : 0,
-    opts.reviewPct ?? null,
-  ).run();
+  )
+    .bind(
+      id,
+      name,
+      NOW,
+      opts.hasSingle === false ? 0 : 1,
+      opts.hasCoop ? 1 : 0,
+      opts.hasPvp ? 1 : 0,
+      opts.reviewPct ?? null,
+    )
+    .run();
 }
 
 async function seedOwnership(userId: string, gameId: string, playtime = 100) {
   await env.DB.prepare(
     `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, added_at)
           VALUES (?, ?, 'steam', ?, ?)`,
-  ).bind(userId, gameId, playtime, NOW).run();
+  )
+    .bind(userId, gameId, playtime, NOW)
+    .run();
 }
 
 beforeEach(async () => {
@@ -3250,8 +3357,13 @@ beforeEach(async () => {
     env.DB.prepare('DELETE FROM users'),
   ]);
   await db().users.insert({
-    id: 'u_alec', email: 'alec@test.co', emailVerified: true, displayName: 'Alec',
-    avatarUrl: null, createdAt: NOW, updatedAt: NOW,
+    id: 'u_alec',
+    email: 'alec@test.co',
+    emailVerified: true,
+    displayName: 'Alec',
+    avatarUrl: null,
+    createdAt: NOW,
+    updatedAt: NOW,
   });
   alecSession = await createSessionForUser(env.DB, 'u_alec');
   const create = await SELF.fetch('https://x/api/groups', {
@@ -3273,7 +3385,10 @@ describe('GET /api/groups/:gid/library', () => {
       headers: { cookie: `wwp_session=${alecSession}` },
     });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { games: Array<{ game: { id: string }; ownerCount: number }>; total: number };
+    const body = (await res.json()) as {
+      games: Array<{ game: { id: string }; ownerCount: number }>;
+      total: number;
+    };
     expect(body.total).toBe(2);
     expect(body.games.length).toBe(2);
     const ids = body.games.map((g) => g.game.id);
@@ -3288,7 +3403,12 @@ describe('GET /api/groups/:gid/library', () => {
     const res = await SELF.fetch(`https://x/api/groups/${groupId}/library?limit=2&offset=1`, {
       headers: { cookie: `wwp_session=${alecSession}` },
     });
-    const body = (await res.json()) as { games: unknown[]; total: number; limit: number; offset: number };
+    const body = (await res.json()) as {
+      games: unknown[];
+      total: number;
+      limit: number;
+      offset: number;
+    };
     expect(body.games.length).toBe(2);
     expect(body.total).toBe(5);
     expect(body.limit).toBe(2);
@@ -3326,8 +3446,13 @@ describe('GET /api/groups/:gid/library', () => {
 
   test('403 for non-member', async () => {
     await db().users.insert({
-      id: 'u_x', email: 'x@test.co', emailVerified: true, displayName: 'X',
-      avatarUrl: null, createdAt: NOW, updatedAt: NOW,
+      id: 'u_x',
+      email: 'x@test.co',
+      emailVerified: true,
+      displayName: 'X',
+      avatarUrl: null,
+      createdAt: NOW,
+      updatedAt: NOW,
     });
     const xSession = await createSessionForUser(env.DB, 'u_x');
     const res = await SELF.fetch(`https://x/api/groups/${groupId}/library`, {
@@ -3369,8 +3494,9 @@ export async function dispatchLibrary(ctx: RouteCtx): Promise<Response | null> {
   const gid = parts[1]!;
 
   // Membership check
-  const memberRow = await env.DB
-    .prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?')
+  const memberRow = await env.DB.prepare(
+    'SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?',
+  )
     .bind(gid, session.user.id)
     .first();
   if (!memberRow) return jsonStatus({ error: 'forbidden' }, 403);
@@ -3404,24 +3530,22 @@ export async function dispatchLibrary(ctx: RouteCtx): Promise<Response | null> {
   const whereClause = filterClauses.length > 0 ? `AND ${filterClauses.join(' AND ')}` : '';
 
   // Total count (no pagination)
-  const totalRow = (await env.DB
-    .prepare(
-      `SELECT COUNT(DISTINCT g.id) AS n
+  const totalRow = (await env.DB.prepare(
+    `SELECT COUNT(DISTINCT g.id) AS n
          FROM games g
          JOIN game_ownership go ON go.game_id = g.id
          JOIN group_members  gm ON gm.user_id = go.user_id
         WHERE gm.group_id = ?
           ${whereClause}
           ${searchClause}`,
-    )
+  )
     .bind(gid, ...(searchBind ? [searchBind] : []))
     .first()) as { n: number };
   const total = totalRow?.n ?? 0;
 
   // Paged + enriched query
-  const result = await env.DB
-    .prepare(
-      `SELECT g.*,
+  const result = await env.DB.prepare(
+    `SELECT g.*,
               COUNT(DISTINCT go2.user_id) AS ownerCount,
               MAX(go2.last_played_at) AS maxLastPlayed,
               SUM(go2.playtime_minutes) AS totalPlaytime,
@@ -3441,14 +3565,15 @@ export async function dispatchLibrary(ctx: RouteCtx): Promise<Response | null> {
         GROUP BY g.id
         ORDER BY ${sortClause}
         LIMIT ? OFFSET ?`,
-    )
+  )
     .bind(
-      session.user.id,                    // yourPlaytime
-      session.user.id,                    // yourLastPlayed
-      gid, session.user.id,               // yourVote subquery (group_id, user_id)
-      gid,                                // thumbsUp
-      gid,                                // thumbsDown
-      gid,                                // main where
+      session.user.id, // yourPlaytime
+      session.user.id, // yourLastPlayed
+      gid,
+      session.user.id, // yourVote subquery (group_id, user_id)
+      gid, // thumbsUp
+      gid, // thumbsDown
+      gid, // main where
       ...(searchBind ? [searchBind] : []),
       limit,
       offset,
@@ -3525,6 +3650,7 @@ git commit -m "feat(worker): GET /api/groups/:gid/library — paginated combined
 ### Task 23: GET /api/groups/:gid/recommendations
 
 **Files:**
+
 - Create: `apps/worker/src/routes/recommendations.ts`
 - Create: `apps/worker/tests/recommendations-routes.test.ts`
 - Modify: `apps/worker/src/index.ts`
@@ -3532,6 +3658,7 @@ git commit -m "feat(worker): GET /api/groups/:gid/library — paginated combined
 - [ ] **Step 1: Write tests**
 
 `apps/worker/tests/recommendations-routes.test.ts`:
+
 ```ts
 import { test, expect, describe, beforeEach } from 'vitest';
 // @ts-expect-error - cloudflare:test is provided by @cloudflare/vitest-pool-workers
@@ -3556,8 +3683,13 @@ beforeEach(async () => {
     env.DB.prepare('DELETE FROM users'),
   ]);
   await db().users.insert({
-    id: 'u_alec', email: 'a@b.co', emailVerified: true, displayName: 'Alec',
-    avatarUrl: null, createdAt: NOW, updatedAt: NOW,
+    id: 'u_alec',
+    email: 'a@b.co',
+    emailVerified: true,
+    displayName: 'Alec',
+    avatarUrl: null,
+    createdAt: NOW,
+    updatedAt: NOW,
   });
   alecSession = await createSessionForUser(env.DB, 'u_alec');
   const create = await SELF.fetch('https://x/api/groups', {
@@ -3595,13 +3727,20 @@ describe('GET /api/groups/:gid/recommendations', () => {
     // Add a second member to the group so groupSize > 1
     const otherNow = new Date().toISOString();
     await db().users.insert({
-      id: 'u_other', email: 'o@b.co', emailVerified: true, displayName: 'O',
-      avatarUrl: null, createdAt: otherNow, updatedAt: otherNow,
+      id: 'u_other',
+      email: 'o@b.co',
+      emailVerified: true,
+      displayName: 'O',
+      avatarUrl: null,
+      createdAt: otherNow,
+      updatedAt: otherNow,
     });
     await env.DB.prepare(
       `INSERT INTO group_members (group_id, user_id, role, joined_at, weight)
             VALUES (?, ?, 'member', ?, 1.0)`,
-    ).bind(groupId, 'u_other', otherNow).run();
+    )
+      .bind(groupId, 'u_other', otherNow)
+      .run();
 
     await env.DB.batch([
       env.DB.prepare(
@@ -3674,8 +3813,13 @@ describe('GET /api/groups/:gid/recommendations', () => {
 
   test('403 for non-member', async () => {
     await db().users.insert({
-      id: 'u_x', email: 'x@b.co', emailVerified: true, displayName: 'X',
-      avatarUrl: null, createdAt: NOW, updatedAt: NOW,
+      id: 'u_x',
+      email: 'x@b.co',
+      emailVerified: true,
+      displayName: 'X',
+      avatarUrl: null,
+      createdAt: NOW,
+      updatedAt: NOW,
     });
     const xSession = await createSessionForUser(env.DB, 'u_x');
     const res = await SELF.fetch(`https://x/api/groups/${groupId}/recommendations`, {
@@ -3723,8 +3867,9 @@ export async function dispatchRecommendations(ctx: RouteCtx): Promise<Response |
   const gid = parts[1]!;
 
   // Membership check
-  const memberRow = await env.DB
-    .prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?')
+  const memberRow = await env.DB.prepare(
+    'SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?',
+  )
     .bind(gid, session.user.id)
     .first();
   if (!memberRow) return jsonStatus({ error: 'forbidden' }, 403);
@@ -3739,16 +3884,16 @@ export async function dispatchRecommendations(ctx: RouteCtx): Promise<Response |
   const vetoDays = readNumber(env, 'WWP_THUMBS_DOWN_VETO_DAYS', 7);
 
   // Group size
-  const sizeRow = (await env.DB
-    .prepare('SELECT COUNT(*) AS n FROM group_members WHERE group_id = ?')
+  const sizeRow = (await env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM group_members WHERE group_id = ?',
+  )
     .bind(gid)
     .first()) as { n: number };
   const groupSize = sizeRow.n;
 
   // Candidate games (apply filters in SQL)
-  const candidatesResult = await env.DB
-    .prepare(
-      `SELECT DISTINCT g.*
+  const candidatesResult = await env.DB.prepare(
+    `SELECT DISTINCT g.*
          FROM games g
          JOIN game_ownership go ON go.game_id = g.id
          JOIN group_members  gm ON gm.user_id = go.user_id
@@ -3761,7 +3906,7 @@ export async function dispatchRecommendations(ctx: RouteCtx): Promise<Response |
                AND t.vote = -1
                AND t.voted_at > datetime('now', ?)
           )`,
-    )
+  )
     .bind(gid, groupSize === 1 ? 1 : 0, gid, `-${vetoDays} days`)
     .all();
   const candidates = (candidatesResult.results as Record<string, unknown>[]).map((r) => ({
@@ -3772,23 +3917,25 @@ export async function dispatchRecommendations(ctx: RouteCtx): Promise<Response |
   }));
 
   if (candidates.length === 0) {
-    return jsonStatus({
-      picks: [],
-      generatedAt: new Date().toISOString(),
-      weightsUsed: weights,
-      coldStart: true,
-    }, 200);
+    return jsonStatus(
+      {
+        picks: [],
+        generatedAt: new Date().toISOString(),
+        weightsUsed: weights,
+        coldStart: true,
+      },
+      200,
+    );
   }
 
   // Ownership counts + max last played
-  const ownershipResult = await env.DB
-    .prepare(
-      `SELECT go.game_id, COUNT(DISTINCT go.user_id) AS ownerCount, MAX(go.last_played_at) AS maxLastPlayed
+  const ownershipResult = await env.DB.prepare(
+    `SELECT go.game_id, COUNT(DISTINCT go.user_id) AS ownerCount, MAX(go.last_played_at) AS maxLastPlayed
          FROM game_ownership go
          JOIN group_members gm ON gm.user_id = go.user_id
         WHERE gm.group_id = ?
         GROUP BY go.game_id`,
-    )
+  )
     .bind(gid)
     .all();
   const ownership = new Map<string, { ownerCount: number; maxLastPlayed: string | null }>();
@@ -3800,8 +3947,9 @@ export async function dispatchRecommendations(ctx: RouteCtx): Promise<Response |
   }
 
   // Thumbs for this group
-  const thumbsResult = await env.DB
-    .prepare('SELECT user_id, game_id, vote FROM thumbs WHERE group_id = ?')
+  const thumbsResult = await env.DB.prepare(
+    'SELECT user_id, game_id, vote FROM thumbs WHERE group_id = ?',
+  )
     .bind(gid)
     .all();
   const thumbs = new Map<string, Array<{ userId: string; vote: -1 | 1 }>>();
@@ -3824,12 +3972,12 @@ export async function dispatchRecommendations(ctx: RouteCtx): Promise<Response |
   const top = result.picks.slice(0, limit);
   const picks = await Promise.all(
     top.map(async (p) => {
-      const fullGame = await env.DB
-        .prepare('SELECT * FROM games WHERE id = ?')
+      const fullGame = await env.DB.prepare('SELECT * FROM games WHERE id = ?')
         .bind(p.gameId)
         .first();
-      const yourVoteRow = await env.DB
-        .prepare('SELECT vote FROM thumbs WHERE group_id = ? AND user_id = ? AND game_id = ?')
+      const yourVoteRow = await env.DB.prepare(
+        'SELECT vote FROM thumbs WHERE group_id = ? AND user_id = ? AND game_id = ?',
+      )
         .bind(gid, session.user.id, p.gameId)
         .first();
       const own = ownership.get(p.gameId) ?? { ownerCount: 0, maxLastPlayed: null };
@@ -3850,12 +3998,15 @@ export async function dispatchRecommendations(ctx: RouteCtx): Promise<Response |
     }),
   );
 
-  return jsonStatus({
-    picks,
-    generatedAt: new Date().toISOString(),
-    weightsUsed: weights,
-    coldStart: result.coldStart,
-  }, 200);
+  return jsonStatus(
+    {
+      picks,
+      generatedAt: new Date().toISOString(),
+      weightsUsed: weights,
+      coldStart: result.coldStart,
+    },
+    200,
+  );
 }
 
 function rowToGame(r: Record<string, unknown>) {
@@ -3925,11 +4076,13 @@ git commit -m "feat(worker): GET /api/groups/:gid/recommendations — top-N pick
 ### Task 24: GameCard component
 
 **Files:**
+
 - Create: `apps/site/src/components/GameCard.tsx`
 
 - [ ] **Step 1: Write the component**
 
 `apps/site/src/components/GameCard.tsx`:
+
 ```tsx
 import { useState } from 'react';
 import { api } from '../lib/api-client.js';
@@ -4025,7 +4178,9 @@ export default function GameCard({
           {game.steamReviewScoreDesc} · {formatCount(game.steamReviewCount)} reviews
         </div>
       )}
-      <div className="text-xs text-muted">Owned by {ownerCount}/{groupSize}</div>
+      <div className="text-xs text-muted">
+        Owned by {ownerCount}/{groupSize}
+      </div>
       {showThumbs && (
         <div className="mt-1 flex gap-1">
           {lowConfidence && counts.up + counts.down === 0 ? (
@@ -4110,6 +4265,7 @@ In `apps/site/src/components/icons.tsx`, append the two icon components above.
 - [ ] **Step 3: Update GameCard imports + rendering**
 
 In `apps/site/src/components/GameCard.tsx`:
+
 - Add at the top: `import { ThumbUpIcon, ThumbDownIcon } from './icons.js';`
 - Replace each `👍 {counts.up}` with `<span className="flex items-center justify-center gap-1"><ThumbUpIcon /> {counts.up}</span>`
 - Same for 👎.
@@ -4134,12 +4290,14 @@ git commit -m "feat(site): add GameCard component + ThumbUp/Down icons"
 ### Task 25: useConfig hook + api-client `put` method
 
 **Files:**
+
 - Create: `apps/site/src/lib/useConfig.ts`
 - Modify: `apps/site/src/lib/api-client.ts` (add `put`)
 
 - [ ] **Step 1: Add `put` to the api-client**
 
 In `apps/site/src/lib/api-client.ts`, find the `api` object and add:
+
 ```ts
   put: <T>(path: string, body: unknown) => call<T>('PUT', path, body),
 ```
@@ -4149,6 +4307,7 @@ Verify the `call` function already supports the PUT method — it accepts a gene
 - [ ] **Step 2: Write the useConfig hook**
 
 `apps/site/src/lib/useConfig.ts`:
+
 ```ts
 import { useEffect, useState } from 'react';
 import { api } from './api-client.js';
@@ -4224,6 +4383,7 @@ git commit -m "feat(site): useConfig hook + api.put helper"
 ### Task 26: GroupHomeMinimal — "Recommended tonight" section
 
 **Files:**
+
 - Modify: `apps/site/src/components/GroupHomeMinimal.tsx`
 
 - [ ] **Step 1: Add the new types + Recommended section**
@@ -4231,6 +4391,7 @@ git commit -m "feat(site): useConfig hook + api.put helper"
 In `apps/site/src/components/GroupHomeMinimal.tsx`:
 
 Add imports at the top:
+
 ```tsx
 import GameCard from './GameCard.js';
 import { useConfig } from '../lib/useConfig.js';
@@ -4263,6 +4424,7 @@ interface RecommendationsResp {
 ```
 
 Add to state:
+
 ```tsx
 const [recs, setRecs] = useState<RecommendationsResp | null>(null);
 const [recsBusy, setRecsBusy] = useState(false);
@@ -4270,6 +4432,7 @@ const { flags: featureFlags } = useConfig();
 ```
 
 Add to the `load()` function (or as a separate useEffect):
+
 ```tsx
 async function loadRecs() {
   setRecsBusy(true);
@@ -4291,54 +4454,58 @@ useEffect(() => {
 ```
 
 Add the section in the JSX, between Members and the existing Invites section:
+
 ```tsx
-{featureFlags.recommendations && (
-  <section>
-    <header className="mb-2 flex items-center gap-2">
-      <h2 className="text-lg font-medium">
-        Recommended tonight
-        {recs?.coldStart && (
-          <span className="ml-2 text-xs font-normal text-muted">
-            (using Steam ratings — vote thumbs to personalize)
-          </span>
-        )}
-      </h2>
-      <button
-        onClick={() => void loadRecs()}
-        disabled={recsBusy}
-        aria-label="Refresh recommendations"
-        title="Refresh recommendations"
-        className="rounded p-1 text-muted hover:bg-panel hover:text-text disabled:opacity-50"
-      >
-        ↻
-      </button>
-    </header>
-    {recs === null ? (
-      <p className="text-sm text-muted">Loading…</p>
-    ) : recs.picks.length === 0 ? (
-      <p className="text-sm text-muted">
-        No multiplayer games in your shared library yet. Have someone link Steam, or wait for thumb-down vetoes to lift.
-      </p>
-    ) : (
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {recs.picks.map((p) => (
-          <GameCard
-            key={p.game.id}
-            game={p.game}
-            groupId={gid}
-            ownerCount={p.ownerCount}
-            groupSize={p.groupSize}
-            thumbs={p.thumbs}
-            yourVote={p.yourVote}
-            flags={p.flags}
-            showThumbs={featureFlags.thumbs}
-            showRating={featureFlags.steamRatings}
-          />
-        ))}
-      </div>
-    )}
-  </section>
-)}
+{
+  featureFlags.recommendations && (
+    <section>
+      <header className="mb-2 flex items-center gap-2">
+        <h2 className="text-lg font-medium">
+          Recommended tonight
+          {recs?.coldStart && (
+            <span className="ml-2 text-xs font-normal text-muted">
+              (using Steam ratings — vote thumbs to personalize)
+            </span>
+          )}
+        </h2>
+        <button
+          onClick={() => void loadRecs()}
+          disabled={recsBusy}
+          aria-label="Refresh recommendations"
+          title="Refresh recommendations"
+          className="rounded p-1 text-muted hover:bg-panel hover:text-text disabled:opacity-50"
+        >
+          ↻
+        </button>
+      </header>
+      {recs === null ? (
+        <p className="text-sm text-muted">Loading…</p>
+      ) : recs.picks.length === 0 ? (
+        <p className="text-sm text-muted">
+          No multiplayer games in your shared library yet. Have someone link Steam, or wait for
+          thumb-down vetoes to lift.
+        </p>
+      ) : (
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          {recs.picks.map((p) => (
+            <GameCard
+              key={p.game.id}
+              game={p.game}
+              groupId={gid}
+              ownerCount={p.ownerCount}
+              groupSize={p.groupSize}
+              thumbs={p.thumbs}
+              yourVote={p.yourVote}
+              flags={p.flags}
+              showThumbs={featureFlags.thumbs}
+              showRating={featureFlags.steamRatings}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 ```
 
 The `↻` is a unicode refresh symbol. Per project memory (no emojis), replace with a `RefreshIcon` SVG when convenient — or use a circular-arrow Lucide path. For now, accept ↻ since it's a typographic character (U+21BB), not an emoji.
@@ -4382,14 +4549,19 @@ git commit -m "feat(site): Recommended tonight section on group page"
 ### Task 27: GroupHomeMinimal — "Browse library" section
 
 **Files:**
+
 - Modify: `apps/site/src/components/GroupHomeMinimal.tsx`
 
 - [ ] **Step 1: Add types + state**
 
 In the same component, add:
+
 ```tsx
 interface LibraryEntry {
-  game: { id: string; name: string; coverUrl: string | null;
+  game: {
+    id: string;
+    name: string;
+    coverUrl: string | null;
     steamReviewScoreDesc: string | null;
     steamReviewPctPositive: number | null;
     steamReviewCount: number | null;
@@ -4417,6 +4589,7 @@ const LIBRARY_PAGE_SIZE = 24;
 ```
 
 Add load function:
+
 ```tsx
 async function loadLibrary(opts: { offset?: number; filter?: string; q?: string } = {}) {
   const params = new URLSearchParams({
@@ -4442,6 +4615,7 @@ useEffect(() => {
 - [ ] **Step 2: Add the section JSX**
 
 After the Recommended tonight section:
+
 ```tsx
 <section>
   <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -4529,6 +4703,7 @@ git commit -m "feat(site): Browse library section on group page (filter + search
 ### Task 28: MeSettings — Last synced + Refresh button
 
 **Files:**
+
 - Modify: `apps/site/src/components/MeSettings.tsx`
 
 - [ ] **Step 1: Read the file and find the Steam row**
@@ -4542,6 +4717,7 @@ The component renders linked accounts. Find where the Steam linked-row is render
 - [ ] **Step 2: Add state for sync status + handler**
 
 Inside the component:
+
 ```tsx
 const [syncBusy, setSyncBusy] = useState(false);
 const [syncMsg, setSyncMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
@@ -4550,10 +4726,13 @@ async function handleRefresh() {
   setSyncBusy(true);
   setSyncMsg(null);
   try {
-    const r = await api.post<{ ok: boolean; gamesAdded: number; gamesUpdated: number; ownershipRemoved: number; syncedAt: string }>(
-      '/api/me/sync/steam',
-      {},
-    );
+    const r = await api.post<{
+      ok: boolean;
+      gamesAdded: number;
+      gamesUpdated: number;
+      ownershipRemoved: number;
+      syncedAt: string;
+    }>('/api/me/sync/steam', {});
     setSyncMsg({
       kind: 'success',
       text: `Synced. +${r.gamesAdded} new, ${r.gamesUpdated} updated, -${r.ownershipRemoved} removed.`,
@@ -4580,49 +4759,54 @@ async function handleRefresh() {
 Inside the Steam linked-row, add (next to the Unlink button):
 
 ```tsx
-{linkedSteam && (
-  <div className="mt-2 space-y-2">
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-muted">
-        {me.user.steamLibrarySyncedAt
-          ? `Last synced: ${formatRelative(me.user.steamLibrarySyncedAt)}`
-          : 'Never synced'}
-      </span>
-      <button
-        onClick={() => void handleRefresh()}
-        disabled={syncBusy}
-        className="rounded border border-border px-3 py-1 text-xs text-muted hover:border-accent hover:text-accent disabled:opacity-50"
-      >
-        {syncBusy ? 'Syncing…' : 'Refresh library'}
-      </button>
-    </div>
-    {syncMsg && (
-      <div className={`rounded border p-2 text-xs ${
-        syncMsg.kind === 'success'
-          ? 'border-success/40 bg-success/10 text-success'
-          : 'border-danger/40 bg-danger/10 text-danger'
-      }`}>
-        {syncMsg.text}
-        {syncMsg.kind === 'error' && syncMsg.text.includes('Privacy Settings') && (
-          <>
-            {' '}
-            <a
-              href="https://steamcommunity.com/my/edit/settings"
-              target="_blank"
-              rel="noreferrer"
-              className="underline"
-            >
-              Open Steam settings
-            </a>
-          </>
-        )}
+{
+  linkedSteam && (
+    <div className="mt-2 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted">
+          {me.user.steamLibrarySyncedAt
+            ? `Last synced: ${formatRelative(me.user.steamLibrarySyncedAt)}`
+            : 'Never synced'}
+        </span>
+        <button
+          onClick={() => void handleRefresh()}
+          disabled={syncBusy}
+          className="rounded border border-border px-3 py-1 text-xs text-muted hover:border-accent hover:text-accent disabled:opacity-50"
+        >
+          {syncBusy ? 'Syncing…' : 'Refresh library'}
+        </button>
       </div>
-    )}
-  </div>
-)}
+      {syncMsg && (
+        <div
+          className={`rounded border p-2 text-xs ${
+            syncMsg.kind === 'success'
+              ? 'border-success/40 bg-success/10 text-success'
+              : 'border-danger/40 bg-danger/10 text-danger'
+          }`}
+        >
+          {syncMsg.text}
+          {syncMsg.kind === 'error' && syncMsg.text.includes('Privacy Settings') && (
+            <>
+              {' '}
+              <a
+                href="https://steamcommunity.com/my/edit/settings"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                Open Steam settings
+              </a>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 ```
 
 Add a `formatRelative` helper at the bottom of the component file:
+
 ```tsx
 function formatRelative(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -4656,6 +4840,7 @@ git commit -m "feat(site): /me — Last synced timestamp + Refresh library butto
 ### Task 29: Site URL display — banner on /who when sync fails on Link Steam
 
 **Files:**
+
 - Modify: `apps/site/src/components/WhosPlayingMinimal.tsx`
 
 - [ ] **Step 1: Add handling for `linkError=steam-private` query param**
@@ -4708,6 +4893,7 @@ Feature-flagged so problematic pieces can be toggled off via wrangler.toml [vars
 ```
 
 After CI green, merge:
+
 ```bash
 gh pr merge --merge --auto --repo JusAlec/whatweplayin.gg
 ```
@@ -4745,6 +4931,7 @@ Expected: `{"flags":{"autosyncOnLogin":true,"thumbs":true,"recommendations":true
 - [ ] **Step 5: Document smoke-test results**
 
 Append to `docs/deploy.md` (or create if missing):
+
 ```markdown
 ## v2.1 smoke test results — 2026-05-04
 
@@ -4758,6 +4945,7 @@ Append to `docs/deploy.md` (or create if missing):
 - Cold-start label: visible on fresh group (no thumbs yet)
 
 Notes:
+
 - (any observed issues, latencies, weird behavior — fill in during the test)
 ```
 
@@ -4779,39 +4967,40 @@ If anything in the smoke test fails or feels off, file an issue or revisit the r
 
 Spec coverage check (against `docs/superpowers/specs/2026-05-04-whatweplayin-v2-1-design.md`):
 
-| Spec section | Implementing task(s) |
-|---|---|
-| §3.1 New modules — `lib/steam-sync.ts` | Tasks 10-12 |
-| §3.1 New modules — `lib/steam-api.ts` | Tasks 7-9 |
-| §3.1 New modules — `routes/recommendations.ts` | Task 23 |
-| §3.1 New modules — `routes/library.ts` | Task 22 |
-| §3.1 New modules — `routes/thumbs.ts` | Tasks 20-21 |
-| §3.1 New modules — `routes/config.ts` | Task 6 |
-| §3.1 Recommender `v2-thumbs.ts` | Tasks 16-19 |
-| §3.1 Site `GameCard.tsx` | Task 24 |
-| §3.1 Site `useConfig` | Task 25 |
-| §3.1 Site GroupHomeMinimal sections | Tasks 26-27 |
-| §3.1 Site MeSettings refresh | Task 28 |
-| §3.2 Modified routes — auth | Task 15 |
-| §3.2 Modified routes — me | Tasks 13-14 |
-| §3.3 Boundary discipline | Achieved via task structure (steam-api.ts is HTTP-only; recommender takes data in) |
-| §4 Data model — migration 0005 | Task 1 |
-| §4 Data model — types | Task 2, Task 3 |
-| §5 Sync pipeline | Tasks 7-12 |
-| §5.5 Private profile UX | Tasks 13, 15, 28, 29 |
-| §6 Worker routes | Tasks 6, 20-23, plus modified 13-15 |
-| §7 Recommender module | Tasks 16-19 |
-| §8 UI surface | Tasks 24-29 |
-| §9 Feature flags | Tasks 4, 5 |
-| §10 Edge cases (game removed, private, non-game type, etc.) | Covered in steam-sync tests (Tasks 10-12) |
-| §11 Testing strategy | Embedded throughout — 6 test files match the spec's table |
-| §12 Migration / rollout | Task 30 |
+| Spec section                                                | Implementing task(s)                                                               |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| §3.1 New modules — `lib/steam-sync.ts`                      | Tasks 10-12                                                                        |
+| §3.1 New modules — `lib/steam-api.ts`                       | Tasks 7-9                                                                          |
+| §3.1 New modules — `routes/recommendations.ts`              | Task 23                                                                            |
+| §3.1 New modules — `routes/library.ts`                      | Task 22                                                                            |
+| §3.1 New modules — `routes/thumbs.ts`                       | Tasks 20-21                                                                        |
+| §3.1 New modules — `routes/config.ts`                       | Task 6                                                                             |
+| §3.1 Recommender `v2-thumbs.ts`                             | Tasks 16-19                                                                        |
+| §3.1 Site `GameCard.tsx`                                    | Task 24                                                                            |
+| §3.1 Site `useConfig`                                       | Task 25                                                                            |
+| §3.1 Site GroupHomeMinimal sections                         | Tasks 26-27                                                                        |
+| §3.1 Site MeSettings refresh                                | Task 28                                                                            |
+| §3.2 Modified routes — auth                                 | Task 15                                                                            |
+| §3.2 Modified routes — me                                   | Tasks 13-14                                                                        |
+| §3.3 Boundary discipline                                    | Achieved via task structure (steam-api.ts is HTTP-only; recommender takes data in) |
+| §4 Data model — migration 0005                              | Task 1                                                                             |
+| §4 Data model — types                                       | Task 2, Task 3                                                                     |
+| §5 Sync pipeline                                            | Tasks 7-12                                                                         |
+| §5.5 Private profile UX                                     | Tasks 13, 15, 28, 29                                                               |
+| §6 Worker routes                                            | Tasks 6, 20-23, plus modified 13-15                                                |
+| §7 Recommender module                                       | Tasks 16-19                                                                        |
+| §8 UI surface                                               | Tasks 24-29                                                                        |
+| §9 Feature flags                                            | Tasks 4, 5                                                                         |
+| §10 Edge cases (game removed, private, non-game type, etc.) | Covered in steam-sync tests (Tasks 10-12)                                          |
+| §11 Testing strategy                                        | Embedded throughout — 6 test files match the spec's table                          |
+| §12 Migration / rollout                                     | Task 30                                                                            |
 
 No spec section is unaddressed. Self-review complete.
 
 Placeholder scan: searched for "TBD", "TODO", "fill in" — none in the plan.
 
 Type consistency:
+
 - `Thumb`, `GameFlag`, `EnrichedGame`, `RankedPick` defined in Task 2 (auth-shared), used consistently.
 - `RankInput` defined in Task 16, extended in Task 17 (helper inputs), assembled in Task 18.
 - Worker routes use `EnrichedGameForRanking` (recommender's input type) in Task 23 — matches the type defined in Task 16.
@@ -4830,4 +5019,3 @@ Two execution options:
 **2. Inline Execution** — Execute tasks in this session using `superpowers:executing-plans`, batch execution with checkpoints for review.
 
 Which approach?
-

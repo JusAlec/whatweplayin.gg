@@ -38,29 +38,29 @@ v2.0 shipped identity + grouping. v2.1 turns the platform into the actual game-n
 
 **Worker (`apps/worker/src/`):**
 
-| File | Responsibility |
-|---|---|
-| `lib/steam-sync.ts` | Single function `syncSteamLibrary(env, userId, steamId)` — calls Steam Web API + Store API, writes to `games`/`game_ownership`/`users.steam_library_synced_at`. Sole owner of Steam-API surface; routes never call Steam directly. |
-| `routes/recommendations.ts` | `GET /api/groups/:gid/recommendations` |
-| `routes/library.ts` | `GET /api/groups/:gid/library` |
-| `routes/thumbs.ts` | `PUT/DELETE /api/groups/:gid/games/:gameId/thumb` |
-| `routes/config.ts` | `GET /api/config` (returns boolean feature flags for the site) |
+| File                        | Responsibility                                                                                                                                                                                                                     |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/steam-sync.ts`         | Single function `syncSteamLibrary(env, userId, steamId)` — calls Steam Web API + Store API, writes to `games`/`game_ownership`/`users.steam_library_synced_at`. Sole owner of Steam-API surface; routes never call Steam directly. |
+| `routes/recommendations.ts` | `GET /api/groups/:gid/recommendations`                                                                                                                                                                                             |
+| `routes/library.ts`         | `GET /api/groups/:gid/library`                                                                                                                                                                                                     |
+| `routes/thumbs.ts`          | `PUT/DELETE /api/groups/:gid/games/:gameId/thumb`                                                                                                                                                                                  |
+| `routes/config.ts`          | `GET /api/config` (returns boolean feature flags for the site)                                                                                                                                                                     |
 
 **Recommender package (`packages/recommender/src/`):**
 
-| File | Responsibility |
-|---|---|
+| File           | Responsibility                                               |
+| -------------- | ------------------------------------------------------------ |
 | `v2-thumbs.ts` | Pure function `rankByThumbs(input)`. No D1. No side effects. |
 
 The v1 recommender modules (`score.ts`, `preference-match.ts`, `group-fit.ts`, `session-fit.ts`, `novelty.ts`, `effective-rating.ts`, `rank.ts`, `recommend.ts`) stay untouched. They become legacy / reference material; v2.2 may revive them when stable preference sliders return.
 
 **Site (`apps/site/src/`):**
 
-| File | Responsibility |
-|---|---|
-| `components/GameCard.tsx` | Canonical card UI used by both Recommended and Library sections |
-| `components/GroupHomeMinimal.tsx` (modified) | Adds "Recommended tonight" + "Browse library" sections at the bottom |
-| `components/MeSettings.tsx` (modified) | Adds "Last synced · Refresh library" affordance in the Linked accounts row |
+| File                                         | Responsibility                                                             |
+| -------------------------------------------- | -------------------------------------------------------------------------- |
+| `components/GameCard.tsx`                    | Canonical card UI used by both Recommended and Library sections            |
+| `components/GroupHomeMinimal.tsx` (modified) | Adds "Recommended tonight" + "Browse library" sections at the bottom       |
+| `components/MeSettings.tsx` (modified)       | Adds "Last synced · Refresh library" affordance in the Linked accounts row |
 
 ### 3.2 Modified workers
 
@@ -130,9 +130,9 @@ export interface Thumb {
 // Extend the existing Game interface
 export interface Game {
   // ... existing fields
-  steamReviewScore?: number;          // 0-9
-  steamReviewScoreDesc?: string;      // "Very Positive"
-  steamReviewPctPositive?: number;    // 0-100
+  steamReviewScore?: number; // 0-9
+  steamReviewScoreDesc?: string; // "Very Positive"
+  steamReviewPctPositive?: number; // 0-100
   steamReviewCount?: number;
 }
 
@@ -156,8 +156,8 @@ export type GameFlag = 'cold-start' | 'low-confidence' | 'not-enriched' | 'never
 
 ```ts
 interface SyncResult {
-  gamesAdded: number;       // new rows in `games`
-  gamesUpdated: number;     // playtime/last_played refreshed
+  gamesAdded: number; // new rows in `games`
+  gamesUpdated: number; // playtime/last_played refreshed
   ownershipRemoved: number; // games no longer in user's Steam library
   enrichmentDeferred: number; // games queued for ctx.waitUntil enrichment
   syncedAt: string;
@@ -212,11 +212,11 @@ Throws `SteamPrivateProfileError` when `GetOwnedGames` returns no `games` key.
 
 ### 5.3 Trigger pattern
 
-| Trigger | Flow |
-|---|---|
-| **Link Steam callback** | Steps 1-2 blocking (~1s for typical library), redirect immediately. Step 4 enrichment via `ctx.waitUntil` — runs after the response is sent. |
+| Trigger                                        | Flow                                                                                                                                                           |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Link Steam callback**                        | Steps 1-2 blocking (~1s for typical library), redirect immediately. Step 4 enrichment via `ctx.waitUntil` — runs after the response is sent.                   |
 | **Auto-on-login** (`/api/me`, stale + flag on) | Full pipeline 1-5 wrapped in `ctx.waitUntil`. User gets `/api/me` response immediately with whatever data already exists; next page load picks up fresh state. |
-| **Manual refresh** (`POST /api/me/sync/steam`) | Full pipeline 1-5 BLOCKING. User clicked the button; UI shows spinner. Returns `SyncResult`. |
+| **Manual refresh** (`POST /api/me/sync/steam`) | Full pipeline 1-5 BLOCKING. User clicked the button; UI shows spinner. Returns `SyncResult`.                                                                   |
 
 ### 5.4 Idempotency + recovery
 
@@ -228,11 +228,11 @@ Throws `SteamPrivateProfileError` when `GetOwnedGames` returns no `games` key.
 
 Caught at the route layer:
 
-| Caller | Behavior |
-|---|---|
-| Link Steam callback | Redirect to `/who?linkError=steam-private`. Site shows banner with link to Steam privacy settings. |
-| `/api/me` autosync (background) | Log + bump `synced_at` (so the staleness check won't keep re-firing). User-facing: nothing — they didn't ask. |
-| `POST /api/me/sync/steam` | Return `422 { error: 'steam-private', helpUrl: 'https://steamcommunity.com/my/edit/settings' }`. `/me` UI shows inline error. |
+| Caller                          | Behavior                                                                                                                      |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Link Steam callback             | Redirect to `/who?linkError=steam-private`. Site shows banner with link to Steam privacy settings.                            |
+| `/api/me` autosync (background) | Log + bump `synced_at` (so the staleness check won't keep re-firing). User-facing: nothing — they didn't ask.                 |
+| `POST /api/me/sync/steam`       | Return `422 { error: 'steam-private', helpUrl: 'https://steamcommunity.com/my/edit/settings' }`. `/me` UI shows inline error. |
 
 ## 6. Worker routes
 
@@ -370,14 +370,13 @@ if (
   isStale(session.user.steamLibrarySyncedAt, env.WWP_AUTOSYNC_STALENESS_HOURS)
 ) {
   ctx.waitUntil(
-    syncSteamLibrary(env, session.user.id, getLinkedSteamId(session.user.id))
-      .catch((err) => {
-        if (err instanceof SteamPrivateProfileError) {
-          // already bumps synced_at internally to prevent re-fire
-          return;
-        }
-        console.error('autosync failed:', err);
-      }),
+    syncSteamLibrary(env, session.user.id, getLinkedSteamId(session.user.id)).catch((err) => {
+      if (err instanceof SteamPrivateProfileError) {
+        // already bumps synced_at internally to prevent re-fire
+        return;
+      }
+      console.error('autosync failed:', err);
+    }),
   );
 }
 ```
@@ -394,19 +393,19 @@ Response shape unchanged.
 export function rankByThumbs(input: RankInput): RankResult;
 
 export interface RankInput {
-  group:      { id: string; size: number };
+  group: { id: string; size: number };
   candidates: EnrichedGameForRanking[];
-  thumbs:     Map<string, Array<{ userId: string; vote: -1 | 1 }>>;  // game_id → votes
-  ownership:  Map<string, { ownerCount: number; maxLastPlayed: string | null }>;
-  weights:    { thumbs: number; ownership: number; novelty: number };
-  now:        Date;
+  thumbs: Map<string, Array<{ userId: string; vote: -1 | 1 }>>; // game_id → votes
+  ownership: Map<string, { ownerCount: number; maxLastPlayed: string | null }>;
+  weights: { thumbs: number; ownership: number; novelty: number };
+  now: Date;
 }
 
 export interface EnrichedGameForRanking {
   id: string;
   name: string;
-  steamReviewPctPositive: number | null;   // 0..100, NULL if no review data
-  metadataSyncedAt: string | null;         // for not-enriched flag
+  steamReviewPctPositive: number | null; // 0..100, NULL if no review data
+  metadataSyncedAt: string | null; // for not-enriched flag
 }
 
 export interface RankResult {
@@ -452,12 +451,12 @@ Sort descending by `score`. Tiebreaker (within `0.001`): higher `steamReviewPctP
 
 For each pick:
 
-| Flag | Condition |
-|---|---|
-| `cold-start` | `totalGroupThumbs < 5` (group-wide signal) |
-| `low-confidence` | this game has 0–1 group thumbs |
-| `not-enriched` | `metadataSyncedAt` is null |
-| `never-played` | `maxLastPlayed` is null |
+| Flag             | Condition                                  |
+| ---------------- | ------------------------------------------ |
+| `cold-start`     | `totalGroupThumbs < 5` (group-wide signal) |
+| `low-confidence` | this game has 0–1 group thumbs             |
+| `not-enriched`   | `metadataSyncedAt` is null                 |
+| `never-played`   | `maxLastPlayed` is null                    |
 
 Multiple flags can apply simultaneously.
 
@@ -491,6 +490,7 @@ For low-confidence games (0-1 thumbs), tally is replaced with "no votes yet".
 For not-enriched games, cover is a placeholder (Tailwind `bg-panel`) and only the name shows; rating + multiplayer indicators omitted.
 
 Card body is non-interactive. Tapping ↑ or ↓:
+
 - Optimistic UI: update local state immediately
 - Fire `PUT /api/groups/:gid/games/:gameId/thumb` with the new vote
 - On error: revert + show toast
@@ -527,12 +527,12 @@ Reorganization to a Netflix layout (multiple rows, hero image, modal-on-click) i
 
 ### 8.3 Empty / cold-start states
 
-| Condition | UI |
-|---|---|
-| No member has linked Steam | Both new sections collapsed to: *"No libraries linked yet. Have a member link Steam from /me to populate game options."* |
-| Library populated, no thumbs in group | Recommended tonight header reads: *"Recommended tonight (using Steam ratings — vote thumbs to personalize)"*. Cards show normally. |
-| Recommendations empty after filtering | *"No multiplayer games in the shared library. Try linking more libraries or wait for thumb-down vetoes to lift."* |
-| Library empty | *"No games yet. Sync may still be in progress — check back in a moment."* |
+| Condition                             | UI                                                                                                                                 |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| No member has linked Steam            | Both new sections collapsed to: _"No libraries linked yet. Have a member link Steam from /me to populate game options."_           |
+| Library populated, no thumbs in group | Recommended tonight header reads: _"Recommended tonight (using Steam ratings — vote thumbs to personalize)"_. Cards show normally. |
+| Recommendations empty after filtering | _"No multiplayer games in the shared library. Try linking more libraries or wait for thumb-down vetoes to lift."_                  |
+| Library empty                         | _"No games yet. Sync may still be in progress — check back in a moment."_                                                          |
 
 ### 8.4 `/me` Refresh button
 
@@ -546,6 +546,7 @@ In the existing Steam row of Linked accounts:
 ```
 
 `Refresh` button:
+
 - Disabled while syncing
 - Shows spinner during the request
 - "Synced just now" toast on success
@@ -610,10 +611,10 @@ New file. Table format with every flag's name, type (bool/number/string), defaul
 Example:
 
 ```markdown
-| Flag | Type | Default | On | Off | Notes |
-|---|---|---|---|---|---|
-| `WWP_FEAT_AUTOSYNC_ON_LOGIN` | bool | `true` | `/api/me` triggers `ctx.waitUntil(sync)` if user's Steam library is stale | autosync disabled; manual refresh on /me still works | Set to `false` if Steam Web API rate limits become a concern |
-| ... | ... | ... | ... | ... | ... |
+| Flag                         | Type | Default | On                                                                        | Off                                                  | Notes                                                        |
+| ---------------------------- | ---- | ------- | ------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------ |
+| `WWP_FEAT_AUTOSYNC_ON_LOGIN` | bool | `true`  | `/api/me` triggers `ctx.waitUntil(sync)` if user's Steam library is stale | autosync disabled; manual refresh on /me still works | Set to `false` if Steam Web API rate limits become a concern |
+| ...                          | ...  | ...     | ...                                                                       | ...                                                  | ...                                                          |
 ```
 
 ### 9.4 Auto-disable on failure
@@ -622,34 +623,34 @@ Out of scope for v2.1. If a flagged route hits sustained errors, log loudly. Ope
 
 ## 10. Edge cases (explicit handling)
 
-| Case | Handling |
-|---|---|
-| Game removed from Steam library (uninstall, refund) | `DELETE FROM game_ownership WHERE user_id = ? AND game_id NOT IN (returnedAppIds)`. Catalog `games` row stays (useful for other groups). |
-| Steam profile becomes private after initial sync | Catalog stays; future syncs surface `SteamPrivateProfileError`. Existing data shows; refreshes fail gracefully. `synced_at` bumps to prevent autosync churn. |
-| `appdetails` returns `type !== 'game'` | Skip (no insert). Cache appid in in-memory skipped-set with 24h TTL to avoid re-fetching on next sync of any user. |
-| `appreviews` failure for a game | Insert game with NULL review fields. Card omits rating badge. Recommender skips cold-start blend for this game. |
-| Sync killed mid-enrichment (worker timeout) | Idempotent. `metadata_synced_at IS NULL` is the marker; next sync resumes on un-enriched games only. |
-| Cloudflare `ctx.waitUntil` timeout (~30s) | Parallel fan-out of 6 + idempotent recovery → not a hard failure. Worst case: enrichment lags by one extra sync cycle. |
-| Group of 1 (creator alone) | Recommender filter `groupSize > 1` short-circuits to skip multiplayer requirement. Solo cards appear. Same scoring math. |
-| Brand-new group, no thumbs anywhere | Cold-start mode. Recommendations driven by Steam rating + ownership prevalence + novelty. |
-| User unlinks Steam | Existing `DELETE FROM oauth_accounts` + cascading session pattern stays. Their `game_ownership` rows persist (still useful for group recommendations from owners no longer in the group? — actually no, sync pipeline only writes for users who have linked Steam. Once unlinked, no further sync. Ownership rows stay until v2.2 cleanup if needed.) |
-| Recommender returns < 5 picks | UI renders what's there. No padding. |
-| Thumb-vote on a game not in any member's library | `PUT` returns 404. Prevents random thumb-DB pollution. |
-| Concurrent thumbs (user clicks twice fast) | Optimistic UI update + UPSERT. Last write wins; no special handling needed. |
+| Case                                                | Handling                                                                                                                                                                                                                                                                                                                                              |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Game removed from Steam library (uninstall, refund) | `DELETE FROM game_ownership WHERE user_id = ? AND game_id NOT IN (returnedAppIds)`. Catalog `games` row stays (useful for other groups).                                                                                                                                                                                                              |
+| Steam profile becomes private after initial sync    | Catalog stays; future syncs surface `SteamPrivateProfileError`. Existing data shows; refreshes fail gracefully. `synced_at` bumps to prevent autosync churn.                                                                                                                                                                                          |
+| `appdetails` returns `type !== 'game'`              | Skip (no insert). Cache appid in in-memory skipped-set with 24h TTL to avoid re-fetching on next sync of any user.                                                                                                                                                                                                                                    |
+| `appreviews` failure for a game                     | Insert game with NULL review fields. Card omits rating badge. Recommender skips cold-start blend for this game.                                                                                                                                                                                                                                       |
+| Sync killed mid-enrichment (worker timeout)         | Idempotent. `metadata_synced_at IS NULL` is the marker; next sync resumes on un-enriched games only.                                                                                                                                                                                                                                                  |
+| Cloudflare `ctx.waitUntil` timeout (~30s)           | Parallel fan-out of 6 + idempotent recovery → not a hard failure. Worst case: enrichment lags by one extra sync cycle.                                                                                                                                                                                                                                |
+| Group of 1 (creator alone)                          | Recommender filter `groupSize > 1` short-circuits to skip multiplayer requirement. Solo cards appear. Same scoring math.                                                                                                                                                                                                                              |
+| Brand-new group, no thumbs anywhere                 | Cold-start mode. Recommendations driven by Steam rating + ownership prevalence + novelty.                                                                                                                                                                                                                                                             |
+| User unlinks Steam                                  | Existing `DELETE FROM oauth_accounts` + cascading session pattern stays. Their `game_ownership` rows persist (still useful for group recommendations from owners no longer in the group? — actually no, sync pipeline only writes for users who have linked Steam. Once unlinked, no further sync. Ownership rows stay until v2.2 cleanup if needed.) |
+| Recommender returns < 5 picks                       | UI renders what's there. No padding.                                                                                                                                                                                                                                                                                                                  |
+| Thumb-vote on a game not in any member's library    | `PUT` returns 404. Prevents random thumb-DB pollution.                                                                                                                                                                                                                                                                                                |
+| Concurrent thumbs (user clicks twice fast)          | Optimistic UI update + UPSERT. Last write wins; no special handling needed.                                                                                                                                                                                                                                                                           |
 
 ## 11. Testing strategy
 
 ### 11.1 New tests (target ~44 new tests; brings worker from 81 → ~125)
 
-| File | Tests | Style |
-|---|---|---|
-| `apps/worker/tests/steam-sync.test.ts` | ~10 | Mock fetch via injected `fetchImpl`. Cover: happy path / private profile / partial enrichment failure / DLC skip / removed-game cleanup. |
-| `apps/worker/tests/recommendations-routes.test.ts` | ~6 | Seed groups + games + thumbs. Hit route. Assert ordering + flags + cold-start mode. |
-| `apps/worker/tests/library-routes.test.ts` | ~5 | Pagination, sort, filter chips, search query. |
-| `apps/worker/tests/thumbs-routes.test.ts` | ~6 | PUT/DELETE happy path, 401 unauth, 403 non-member, 400 invalid vote, 404 game-not-in-catalog, idempotent delete. |
-| `apps/worker/tests/config-route.test.ts` | ~2 | Flag surface, env var combinations. |
-| `packages/recommender/tests/v2-thumbs.test.ts` | ~15 | Pure unit. No D1. Cover all flag conditions, cold-start blend, tiebreaker, edge cases. |
-| **Total** | **~44** | |
+| File                                               | Tests   | Style                                                                                                                                    |
+| -------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/worker/tests/steam-sync.test.ts`             | ~10     | Mock fetch via injected `fetchImpl`. Cover: happy path / private profile / partial enrichment failure / DLC skip / removed-game cleanup. |
+| `apps/worker/tests/recommendations-routes.test.ts` | ~6      | Seed groups + games + thumbs. Hit route. Assert ordering + flags + cold-start mode.                                                      |
+| `apps/worker/tests/library-routes.test.ts`         | ~5      | Pagination, sort, filter chips, search query.                                                                                            |
+| `apps/worker/tests/thumbs-routes.test.ts`          | ~6      | PUT/DELETE happy path, 401 unauth, 403 non-member, 400 invalid vote, 404 game-not-in-catalog, idempotent delete.                         |
+| `apps/worker/tests/config-route.test.ts`           | ~2      | Flag surface, env var combinations.                                                                                                      |
+| `packages/recommender/tests/v2-thumbs.test.ts`     | ~15     | Pure unit. No D1. Cover all flag conditions, cold-start blend, tiebreaker, edge cases.                                                   |
+| **Total**                                          | **~44** |                                                                                                                                          |
 
 ### 11.2 Existing tests
 
@@ -658,6 +659,7 @@ All 81 v2.0 worker tests must still pass after the v2.1 batch lands. Any failure
 ### 11.3 Site tests
 
 E2E (Playwright) deferred to v2.2 with the Netflix UI rebuild. v2.1 site verification:
+
 - `pnpm --filter @wwp/site build` clean
 - `pnpm --filter @wwp/site typecheck` clean
 - Manual smoke per deploy: link Steam → see library populate → thumbs vote → recommendations show
@@ -665,6 +667,7 @@ E2E (Playwright) deferred to v2.2 with the Netflix UI rebuild. v2.1 site verific
 ### 11.4 Integration smoke after deploy
 
 After v2.1 deploys to production, manual smoke checklist (no automation):
+
 1. `curl https://api.whatweplayin.gg/api/config` returns flags
 2. Link Steam (if not already) → /who shows your library populating
 3. Thumbs up/down a few games → see vote tallies update
@@ -690,6 +693,7 @@ After v2.1 deploys to production, manual smoke checklist (no automation):
 ### 12.3 Rollback
 
 If v2.1 misbehaves in production:
+
 1. Set all `WWP_FEAT_*` flags to `"false"` in wrangler.toml + redeploy. New routes return 503; UI hides the new sections. v2.0 functionality unaffected.
 2. Migration can stay applied (additive; no data loss for v2.0).
 3. If a deeper revert is needed: `git revert` the v2.1 commits, redeploy.
@@ -731,9 +735,9 @@ Group members can see what each other owns and how each other voted. This is int
 
 ## 14. Roadmap context
 
-| Version | Scope |
-|---|---|
-| v2.0 (shipped) | Auth, groups, invites, sessions, /me settings |
-| **v2.1 (this spec)** | **Steam library sync, lightweight recommender, thumbs voting, minimal UI** |
-| v2.2 (next) | Netflix UI rebuild: hero, multiple rows, modal cards, IGDB metadata, optional cron-based catalog refresh |
-| v2.3+ | Stable preference sliders revival, additional library sources, session log |
+| Version              | Scope                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------- |
+| v2.0 (shipped)       | Auth, groups, invites, sessions, /me settings                                                            |
+| **v2.1 (this spec)** | **Steam library sync, lightweight recommender, thumbs voting, minimal UI**                               |
+| v2.2 (next)          | Netflix UI rebuild: hero, multiple rows, modal cards, IGDB metadata, optional cron-based catalog refresh |
+| v2.3+                | Stable preference sliders revival, additional library sources, session log                               |
