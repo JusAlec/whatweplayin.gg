@@ -7,6 +7,7 @@ import { dispatchKvCrud } from './routes/kv-crud.js';
 import { dispatchVotes } from './routes/votes.js';
 import { dispatchSessions } from './routes/sessions.js';
 import { dispatchState } from './routes/state.js';
+import { dispatchThumbs } from './routes/thumbs.js';
 import { checkAuth as checkGroupSecret } from './auth.js';
 
 export interface Env {
@@ -66,6 +67,8 @@ export default {
       if (invitesResp) return withCors(invitesResp, request, env);
       const inviteByCodeResp = await dispatchInviteByCode({ request, env, parts: apiParts });
       if (inviteByCodeResp) return withCors(inviteByCodeResp, request, env);
+      const thumbsResp = await dispatchThumbs({ request, env, parts: apiParts });
+      if (thumbsResp) return withCors(thumbsResp, request, env);
       return withCors(new Response('not found', { status: 404 }), request, env);
     }
 
