@@ -116,16 +116,18 @@ export default function GroupHomeMinimal({ gid }: Props) {
   }, [featureFlags.recommendations, group]);
 
   async function loadLibrary(opts: { offset?: number; filter?: LibraryFilter; q?: string } = {}) {
+    const offset = opts.offset ?? 0;
     const params = new URLSearchParams({
       limit: String(LIBRARY_PAGE_SIZE),
-      offset: String(opts.offset ?? 0),
+      offset: String(offset),
       filter: opts.filter ?? libraryFilter,
     });
     const q = opts.q ?? librarySearchActive;
     if (q) params.set('q', q);
     try {
       const r = await api.get<LibraryResp>(`/api/groups/${gid}/library?${params}`);
-      setLibrary(r);
+      // Append on Load More (offset > 0); replace on initial load / filter / search change.
+      setLibrary((prev) => (offset > 0 && prev ? { ...r, games: [...prev.games, ...r.games] } : r));
     } catch (err) {
       console.error('library fetch failed:', err);
     }
@@ -248,18 +250,19 @@ export default function GroupHomeMinimal({ gid }: Props) {
           ) : (
             <div className="flex gap-3 overflow-x-auto pb-2">
               {recs.picks.map((p) => (
-                <GameCard
-                  key={p.game.id}
-                  game={p.game}
-                  groupId={gid}
-                  ownerCount={p.ownerCount}
-                  groupSize={p.groupSize}
-                  thumbs={p.thumbs}
-                  yourVote={p.yourVote}
-                  flags={p.flags}
-                  showThumbs={featureFlags.thumbs}
-                  showRating={featureFlags.steamRatings}
-                />
+                <div key={p.game.id} className="w-48 shrink-0">
+                  <GameCard
+                    game={p.game}
+                    groupId={gid}
+                    ownerCount={p.ownerCount}
+                    groupSize={p.groupSize}
+                    thumbs={p.thumbs}
+                    yourVote={p.yourVote}
+                    flags={p.flags}
+                    showThumbs={featureFlags.thumbs}
+                    showRating={featureFlags.steamRatings}
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -300,7 +303,7 @@ export default function GroupHomeMinimal({ gid }: Props) {
           <p className="text-muted text-sm">No games match.</p>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {library.games.map((entry) => (
                 <GameCard
                   key={entry.game.id}
