@@ -18,12 +18,25 @@ interface SyncResultBody {
   syncedAt: string;
 }
 
+interface EnrichMoreResult {
+  ok: boolean;
+  enriched: number;
+  unenrichedRemaining: number;
+}
+
+interface EnrichmentProgress {
+  total: number; // initial unenriched count, fixed for the duration of the loop
+  remaining: number; // current count, ticks down
+  cancelled: boolean;
+}
+
 export default function MeSettings() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncMsg, setSyncMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const [enrichmentProgress, setEnrichmentProgress] = useState<EnrichmentProgress | null>(null);
 
   async function load() {
     setError(null);
@@ -50,15 +63,18 @@ export default function MeSettings() {
   async function refreshSteam() {
     setSyncBusy(true);
     setSyncMsg(null);
+    setEnrichmentProgress(null);
     try {
       const r = await api.post<SyncResultBody>('/api/me/sync/steam', {});
-      const base = `Synced. +${r.gamesAdded} new, ${r.gamesUpdated} updated, -${r.ownershipRemoved} removed.`;
-      const remainingNote =
-        r.unenrichedRemaining > 0
-          ? ` ${r.unenrichedRemaining} games still need metadata — click Refresh again to continue.`
-          : '';
-      setSyncMsg({ kind: 'success', text: base + remainingNote });
+      setSyncMsg({
+        kind: 'success',
+        text: `Synced. +${r.gamesAdded} new, ${r.gamesUpdated} updated, -${r.ownershipRemoved} removed.`,
+      });
       await load();
+      if (r.unenrichedRemaining > 0) {
+        // Kick off the auto-loop. setSyncBusy stays true until enrichment finishes.
+        await runEnrichmentLoop(r.unenrichedRemaining);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes('steam-private') || msg.includes('422')) {
@@ -72,6 +88,62 @@ export default function MeSettings() {
     } finally {
       setSyncBusy(false);
     }
+  }
+
+  async function runEnrichmentLoop(total: number) {
+    setEnrichmentProgress({ total, remaining: total, cancelled: false });
+    let remaining = total;
+    let consecutiveNoProgress = 0;
+    const MAX_NO_PROGRESS = 3;
+    while (remaining > 0) {
+      // Read latest cancelled state via functional setter to avoid stale closure.
+      let cancelled = false;
+      setEnrichmentProgress((prev) => {
+        cancelled = prev?.cancelled ?? false;
+        return prev;
+      });
+      if (cancelled) break;
+
+      try {
+        const r = await api.post<EnrichMoreResult>('/api/me/enrich-more', {});
+        const newRemaining = r.unenrichedRemaining;
+        if (newRemaining >= remaining) {
+          consecutiveNoProgress++;
+          if (consecutiveNoProgress >= MAX_NO_PROGRESS) {
+            setSyncMsg({
+              kind: 'error',
+              text: `Enrichment stalled at ${newRemaining} remaining games. Some games may have failed Steam Store lookups.`,
+            });
+            break;
+          }
+        } else {
+          consecutiveNoProgress = 0;
+        }
+        remaining = newRemaining;
+        setEnrichmentProgress((prev) =>
+          prev
+            ? { ...prev, remaining: newRemaining }
+            : { total, remaining: newRemaining, cancelled: false },
+        );
+      } catch (err) {
+        setSyncMsg({
+          kind: 'error',
+          text: `Enrichment failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
+        break;
+      }
+    }
+    if (remaining === 0) {
+      setSyncMsg({
+        kind: 'success',
+        text: `All ${total} games enriched.`,
+      });
+    }
+    setEnrichmentProgress(null);
+  }
+
+  function cancelEnrichment() {
+    setEnrichmentProgress((prev) => (prev ? { ...prev, cancelled: true } : null));
   }
 
   async function unlink(provider: string) {
@@ -223,6 +295,34 @@ export default function MeSettings() {
                     </a>
                   </>
                 )}
+              </div>
+            )}
+            {enrichmentProgress && (
+              <div className="space-y-1 rounded border border-border bg-bg p-2">
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted">
+                    Enriching metadata: {enrichmentProgress.total - enrichmentProgress.remaining} of{' '}
+                    {enrichmentProgress.total}
+                  </span>
+                  <button
+                    onClick={cancelEnrichment}
+                    className="text-xs text-muted underline hover:text-text"
+                  >
+                    Stop
+                  </button>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded bg-border">
+                  <div
+                    className="h-full bg-accent transition-all"
+                    style={{
+                      width: `${
+                        ((enrichmentProgress.total - enrichmentProgress.remaining) /
+                          Math.max(1, enrichmentProgress.total)) *
+                        100
+                      }%`,
+                    }}
+                  />
+                </div>
               </div>
             )}
           </div>
