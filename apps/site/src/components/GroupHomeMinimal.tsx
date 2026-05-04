@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, AuthError } from '../lib/api-client.js';
-import type { Group, GroupInvite } from '@wwp/auth-shared';
+import type { Group, GroupInvite, GroupMember } from '@wwp/auth-shared';
 
 interface Props {
   gid: string;
@@ -8,6 +8,7 @@ interface Props {
 
 export default function GroupHomeMinimal({ gid }: Props) {
   const [group, setGroup] = useState<Group | null>(null);
+  const [members, setMembers] = useState<GroupMember[]>([]);
   const [invites, setInvites] = useState<GroupInvite[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -15,12 +16,15 @@ export default function GroupHomeMinimal({ gid }: Props) {
   async function load() {
     setError(null);
     try {
-      const [g, inv] = await Promise.all([
-        api.get<Group>(`/api/groups/${gid}`),
-        api.get<GroupInvite[]>(`/api/groups/${gid}/invites`).catch(() => [] as GroupInvite[]),
+      const [detail, inv] = await Promise.all([
+        api.get<{ group: Group; members: GroupMember[] }>(`/api/groups/${gid}`),
+        api
+          .get<{ invites: GroupInvite[] }>(`/api/groups/${gid}/invites`)
+          .catch(() => ({ invites: [] as GroupInvite[] })),
       ]);
-      setGroup(g);
-      setInvites(inv);
+      setGroup(detail.group);
+      setMembers(detail.members);
+      setInvites(inv.invites);
     } catch (e) {
       if (e instanceof AuthError) {
         window.location.href = '/signin';
@@ -38,7 +42,7 @@ export default function GroupHomeMinimal({ gid }: Props) {
     setBusy(true);
     setError(null);
     try {
-      await api.post<GroupInvite>(`/api/groups/${gid}/invites`, {});
+      await api.post<{ code: string }>(`/api/groups/${gid}/invites`, {});
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -87,9 +91,21 @@ export default function GroupHomeMinimal({ gid }: Props) {
         </a>
         <h1 className="text-2xl font-semibold">{group.displayName}</h1>
         <p className="text-xs text-muted">
-          {group.memberCount} member{group.memberCount === 1 ? '' : 's'}
+          {members.length} member{members.length === 1 ? '' : 's'}
         </p>
       </header>
+
+      <section className="space-y-2">
+        <h2 className="text-sm uppercase text-muted">Members</h2>
+        <ul className="divide-y divide-border rounded bg-panel">
+          {members.map((m) => (
+            <li key={m.userId} className="flex justify-between p-3 text-sm">
+              <span className="font-mono">{m.userId.slice(0, 10)}…</span>
+              <span className="text-xs text-muted">{m.role}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
