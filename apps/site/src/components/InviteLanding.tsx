@@ -68,7 +68,9 @@ export default function InviteLanding({ code }: Props) {
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold">Invite unavailable</h1>
         <p className="text-sm text-danger">{state.message}</p>
-        <a href="/" className="text-sm text-muted hover:text-text">← Home</a>
+        <a href="/" className="text-sm text-muted hover:text-text">
+          ← Home
+        </a>
       </div>
     );
   }

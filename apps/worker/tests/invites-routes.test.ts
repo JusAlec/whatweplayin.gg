@@ -19,8 +19,13 @@ beforeEach(async () => {
   ]);
   const now = new Date().toISOString();
   await db().users.insert({
-    id: 'u_alec', email: 'alec@test.co', emailVerified: true, displayName: 'Alec',
-    avatarUrl: null, createdAt: now, updatedAt: now,
+    id: 'u_alec',
+    email: 'alec@test.co',
+    emailVerified: true,
+    displayName: 'Alec',
+    avatarUrl: null,
+    createdAt: now,
+    updatedAt: now,
   });
   alecSession = await createSessionForUser(env.DB, 'u_alec');
 
@@ -50,8 +55,13 @@ describe('POST /api/groups/:gid/invites', () => {
   test('rejects non-member with 403', async () => {
     const now = new Date().toISOString();
     await db().users.insert({
-      id: 'u_x', email: 'x@test.co', emailVerified: true, displayName: 'X',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u_x',
+      email: 'x@test.co',
+      emailVerified: true,
+      displayName: 'X',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     const xSession = await createSessionForUser(env.DB, 'u_x');
 
@@ -90,8 +100,13 @@ describe('POST /api/invites/accept', () => {
 
     const now = new Date().toISOString();
     await db().users.insert({
-      id: 'u_mike', email: 'mike@test.co', emailVerified: true, displayName: 'Mike',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u_mike',
+      email: 'mike@test.co',
+      emailVerified: true,
+      displayName: 'Mike',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     const mikeSession = await createSessionForUser(env.DB, 'u_mike');
 
@@ -110,17 +125,21 @@ describe('POST /api/invites/accept', () => {
   });
 
   test('expired invite returns 410', async () => {
-    await env.DB
-      .prepare(
-        'INSERT INTO group_invites (code, group_id, created_by, expires_at, max_uses, use_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      )
+    await env.DB.prepare(
+      'INSERT INTO group_invites (code, group_id, created_by, expires_at, max_uses, use_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    )
       .bind('expired1', groupId, 'u_alec', '2020-01-01T00:00:00Z', 0, 0, '2020-01-01T00:00:00Z')
       .run();
 
     const now = new Date().toISOString();
     await db().users.insert({
-      id: 'u_y', email: 'y@test.co', emailVerified: true, displayName: 'Y',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u_y',
+      email: 'y@test.co',
+      emailVerified: true,
+      displayName: 'Y',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     const ySession = await createSessionForUser(env.DB, 'u_y');
 
@@ -133,18 +152,29 @@ describe('POST /api/invites/accept', () => {
   });
 
   test('max-uses exhausted returns 410', async () => {
-    await env.DB
-      .prepare(
-        'INSERT INTO group_invites (code, group_id, created_by, expires_at, max_uses, use_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    await env.DB.prepare(
+      'INSERT INTO group_invites (code, group_id, created_by, expires_at, max_uses, use_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    )
+      .bind(
+        'limited1',
+        groupId,
+        'u_alec',
+        new Date(Date.now() + 86_400_000).toISOString(),
+        1,
+        1,
+        new Date().toISOString(),
       )
-      .bind('limited1', groupId, 'u_alec',
-        new Date(Date.now() + 86_400_000).toISOString(), 1, 1, new Date().toISOString())
       .run();
 
     const now = new Date().toISOString();
     await db().users.insert({
-      id: 'u_z', email: 'z@test.co', emailVerified: true, displayName: 'Z',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u_z',
+      email: 'z@test.co',
+      emailVerified: true,
+      displayName: 'Z',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     const zSession = await createSessionForUser(env.DB, 'u_z');
 
@@ -184,16 +214,19 @@ describe('GET /api/invites/:code (preview)', () => {
 
     const res = await SELF.fetch(`https://x/api/invites/${code}`);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { groupName: string; memberCount: number; expiresAt: string };
+    const body = (await res.json()) as {
+      groupName: string;
+      memberCount: number;
+      expiresAt: string;
+    };
     expect(body.groupName).toBe('RIVALS');
     expect(body.memberCount).toBe(1);
   });
 
   test('expired invite returns 410', async () => {
-    await env.DB
-      .prepare(
-        'INSERT INTO group_invites (code, group_id, created_by, expires_at, max_uses, use_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      )
+    await env.DB.prepare(
+      'INSERT INTO group_invites (code, group_id, created_by, expires_at, max_uses, use_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    )
       .bind('exp9', groupId, 'u_alec', '2020-01-01T00:00:00Z', 0, 0, '2020-01-01T00:00:00Z')
       .run();
     const res = await SELF.fetch('https://x/api/invites/exp9');

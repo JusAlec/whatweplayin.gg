@@ -59,14 +59,13 @@ export async function dispatchGroups(ctx: RouteCtx): Promise<Response | null> {
 
   // GET /api/groups → list user's groups
   if (parts.length === 1 && request.method === 'GET') {
-    const result = await env.DB
-      .prepare(
-        `SELECT g.id, g.display_name, g.created_at, gm.role
+    const result = await env.DB.prepare(
+      `SELECT g.id, g.display_name, g.created_at, gm.role
            FROM groups g
            JOIN group_members gm ON gm.group_id = g.id
           WHERE gm.user_id = ?
           ORDER BY gm.joined_at DESC`,
-      )
+    )
       .bind(session.user.id)
       .all();
     const groups = (result.results as Record<string, unknown>[]).map((r) => ({
@@ -83,8 +82,9 @@ export async function dispatchGroups(ctx: RouteCtx): Promise<Response | null> {
     const gid = parts[1]!;
     const dbi = new Db(env.DB);
 
-    const memberRow = await env.DB
-      .prepare('SELECT role FROM group_members WHERE group_id = ? AND user_id = ?')
+    const memberRow = await env.DB.prepare(
+      'SELECT role FROM group_members WHERE group_id = ? AND user_id = ?',
+    )
       .bind(gid, session.user.id)
       .first();
     if (!memberRow) return jsonStatus({ error: 'forbidden' }, 403);
@@ -99,8 +99,9 @@ export async function dispatchGroups(ctx: RouteCtx): Promise<Response | null> {
   // PATCH /api/groups/:gid → creator-only
   if (parts.length === 2 && request.method === 'PATCH') {
     const gid = parts[1]!;
-    const memberRow = (await env.DB
-      .prepare('SELECT role FROM group_members WHERE group_id = ? AND user_id = ?')
+    const memberRow = (await env.DB.prepare(
+      'SELECT role FROM group_members WHERE group_id = ? AND user_id = ?',
+    )
       .bind(gid, session.user.id)
       .first()) as { role?: string } | null;
     if (!memberRow) return jsonStatus({ error: 'forbidden' }, 403);
@@ -123,8 +124,7 @@ export async function dispatchGroups(ctx: RouteCtx): Promise<Response | null> {
     if (updates.length === 0) return jsonStatus({ error: 'no fields to update' }, 400);
 
     binds.push(gid);
-    await env.DB
-      .prepare(`UPDATE groups SET ${updates.join(', ')} WHERE id = ?`)
+    await env.DB.prepare(`UPDATE groups SET ${updates.join(', ')} WHERE id = ?`)
       .bind(...binds)
       .run();
     return jsonStatus({ ok: true }, 200);
@@ -133,8 +133,9 @@ export async function dispatchGroups(ctx: RouteCtx): Promise<Response | null> {
   // DELETE /api/groups/:gid → creator only
   if (parts.length === 2 && request.method === 'DELETE') {
     const gid = parts[1]!;
-    const memberRow = (await env.DB
-      .prepare('SELECT role FROM group_members WHERE group_id = ? AND user_id = ?')
+    const memberRow = (await env.DB.prepare(
+      'SELECT role FROM group_members WHERE group_id = ? AND user_id = ?',
+    )
       .bind(gid, session.user.id)
       .first()) as { role?: string } | null;
     if (!memberRow) return jsonStatus({ error: 'forbidden' }, 403);
@@ -148,8 +149,9 @@ export async function dispatchGroups(ctx: RouteCtx): Promise<Response | null> {
   // POST /api/groups/:gid/leave
   if (parts.length === 3 && parts[2] === 'leave' && request.method === 'POST') {
     const gid = parts[1]!;
-    const memberRow = (await env.DB
-      .prepare('SELECT role FROM group_members WHERE group_id = ? AND user_id = ?')
+    const memberRow = (await env.DB.prepare(
+      'SELECT role FROM group_members WHERE group_id = ? AND user_id = ?',
+    )
       .bind(gid, session.user.id)
       .first()) as { role?: string } | null;
     if (!memberRow) return jsonStatus({ error: 'not a member' }, 403);
@@ -157,12 +159,10 @@ export async function dispatchGroups(ctx: RouteCtx): Promise<Response | null> {
       return jsonStatus({ error: 'creators cannot leave; delete the group instead' }, 409);
     }
 
-    await env.DB
-      .prepare('DELETE FROM group_members WHERE group_id = ? AND user_id = ?')
+    await env.DB.prepare('DELETE FROM group_members WHERE group_id = ? AND user_id = ?')
       .bind(gid, session.user.id)
       .run();
-    await env.DB
-      .prepare('UPDATE groups SET member_count = member_count - 1 WHERE id = ?')
+    await env.DB.prepare('UPDATE groups SET member_count = member_count - 1 WHERE id = ?')
       .bind(gid)
       .run();
     return jsonStatus({ ok: true }, 200);

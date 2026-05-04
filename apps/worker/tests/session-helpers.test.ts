@@ -2,19 +2,26 @@ import { test, expect, describe, beforeEach } from 'vitest';
 // @ts-expect-error - cloudflare:test is provided by @cloudflare/vitest-pool-workers
 import { env } from 'cloudflare:test';
 import { Db } from '../src/lib/d1-client.js';
-import { createSessionForUser, getSessionFromRequest, sessionCookie, clearSessionCookie } from '../src/auth/session-helpers.js';
+import {
+  createSessionForUser,
+  getSessionFromRequest,
+  sessionCookie,
+  clearSessionCookie,
+} from '../src/auth/session-helpers.js';
 
 const db = () => new Db(env.DB);
 
 beforeEach(async () => {
-  await env.DB.batch([
-    env.DB.prepare('DELETE FROM sessions'),
-    env.DB.prepare('DELETE FROM users'),
-  ]);
+  await env.DB.batch([env.DB.prepare('DELETE FROM sessions'), env.DB.prepare('DELETE FROM users')]);
   const now = new Date().toISOString();
   await db().users.insert({
-    id: 'u1', email: 'a@b.co', emailVerified: true, displayName: 'A',
-    avatarUrl: null, createdAt: now, updatedAt: now,
+    id: 'u1',
+    email: 'a@b.co',
+    emailVerified: true,
+    displayName: 'A',
+    avatarUrl: null,
+    createdAt: now,
+    updatedAt: now,
   });
 });
 
@@ -42,8 +49,9 @@ describe('getSessionFromRequest', () => {
   });
 
   test('returns null for expired session', async () => {
-    await env.DB
-      .prepare('INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
+    await env.DB.prepare(
+      'INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)',
+    )
       .bind('expired-session', 'u1', '2020-01-01T00:00:00Z', '2020-01-01T00:00:00Z')
       .run();
     const req = new Request('https://x/', { headers: { cookie: 'wwp_session=expired-session' } });

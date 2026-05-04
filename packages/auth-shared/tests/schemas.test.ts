@@ -72,17 +72,32 @@ describe('ThumbVoteRequestSchema', () => {
 
 describe('DimVoteRequestSchema', () => {
   test('accepts valid dim + value', () => {
-    const r = DimVoteRequestSchema.safeParse({ groupId: 'g', gameId: 'v', dim: 'combat', value: 3 });
+    const r = DimVoteRequestSchema.safeParse({
+      groupId: 'g',
+      gameId: 'v',
+      dim: 'combat',
+      value: 3,
+    });
     expect(r.success).toBe(true);
   });
 
   test('rejects unknown dim', () => {
-    const r = DimVoteRequestSchema.safeParse({ groupId: 'g', gameId: 'v', dim: 'teamwork', value: 3 });
+    const r = DimVoteRequestSchema.safeParse({
+      groupId: 'g',
+      gameId: 'v',
+      dim: 'teamwork',
+      value: 3,
+    });
     expect(r.success).toBe(false);
   });
 
   test('rejects value 6', () => {
-    const r = DimVoteRequestSchema.safeParse({ groupId: 'g', gameId: 'v', dim: 'combat', value: 6 });
+    const r = DimVoteRequestSchema.safeParse({
+      groupId: 'g',
+      gameId: 'v',
+      dim: 'combat',
+      value: 6,
+    });
     expect(r.success).toBe(false);
   });
 });
@@ -90,14 +105,23 @@ describe('DimVoteRequestSchema', () => {
 describe('StablePrefsSchema', () => {
   test('accepts all 6 dims at value 3', () => {
     const r = StablePrefsSchema.safeParse({
-      combat: 3, grind: 3, buildingDepth: 3, commitmentLevel: 3, pvpFocus: 3, sessionLength: 3,
+      combat: 3,
+      grind: 3,
+      buildingDepth: 3,
+      commitmentLevel: 3,
+      pvpFocus: 3,
+      sessionLength: 3,
     });
     expect(r.success).toBe(true);
   });
 
   test('rejects missing dim', () => {
     const r = StablePrefsSchema.safeParse({
-      combat: 3, grind: 3, buildingDepth: 3, commitmentLevel: 3, pvpFocus: 3,
+      combat: 3,
+      grind: 3,
+      buildingDepth: 3,
+      commitmentLevel: 3,
+      pvpFocus: 3,
     });
     expect(r.success).toBe(false);
   });
@@ -106,21 +130,30 @@ describe('StablePrefsSchema', () => {
 describe('ScoringWeightsSchema', () => {
   test('accepts default v1 weights', () => {
     const r = ScoringWeightsSchema.safeParse({
-      preferenceMatch: 0.4, groupFit: 0.25, sessionFit: 0.2, novelty: 0.15,
+      preferenceMatch: 0.4,
+      groupFit: 0.25,
+      sessionFit: 0.2,
+      novelty: 0.15,
     });
     expect(r.success).toBe(true);
   });
 
   test('accepts ±0.001 sum tolerance', () => {
     const r = ScoringWeightsSchema.safeParse({
-      preferenceMatch: 0.4, groupFit: 0.25, sessionFit: 0.2, novelty: 0.15001,
+      preferenceMatch: 0.4,
+      groupFit: 0.25,
+      sessionFit: 0.2,
+      novelty: 0.15001,
     });
     expect(r.success).toBe(true);
   });
 
   test('rejects sum 0.95', () => {
     const r = ScoringWeightsSchema.safeParse({
-      preferenceMatch: 0.35, groupFit: 0.25, sessionFit: 0.2, novelty: 0.15,
+      preferenceMatch: 0.35,
+      groupFit: 0.25,
+      sessionFit: 0.2,
+      novelty: 0.15,
     });
     expect(r.success).toBe(false);
   });

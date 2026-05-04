@@ -27,8 +27,9 @@ export async function dispatchInvites(ctx: RouteCtx): Promise<Response | null> {
 
   const gid = parts[1]!;
 
-  const memberRow = await env.DB
-    .prepare('SELECT role FROM group_members WHERE group_id = ? AND user_id = ?')
+  const memberRow = await env.DB.prepare(
+    'SELECT role FROM group_members WHERE group_id = ? AND user_id = ?',
+  )
     .bind(gid, session.user.id)
     .first();
   if (!memberRow) return jsonStatus({ error: 'forbidden' }, 403);
@@ -60,13 +61,12 @@ export async function dispatchInvites(ctx: RouteCtx): Promise<Response | null> {
 
   // GET /api/groups/:gid/invites — list active invites
   if (parts.length === 3 && request.method === 'GET') {
-    const result = await env.DB
-      .prepare(
-        `SELECT code, expires_at, max_uses, use_count, created_at
+    const result = await env.DB.prepare(
+      `SELECT code, expires_at, max_uses, use_count, created_at
            FROM group_invites
           WHERE group_id = ? AND expires_at > ?
           ORDER BY created_at DESC`,
-      )
+    )
       .bind(gid, new Date().toISOString())
       .all();
     const invites = (result.results as Record<string, unknown>[]).map((r) => ({
@@ -82,8 +82,7 @@ export async function dispatchInvites(ctx: RouteCtx): Promise<Response | null> {
   // DELETE /api/groups/:gid/invites/:code — revoke
   if (parts.length === 4 && request.method === 'DELETE') {
     const code = parts[3]!;
-    await env.DB
-      .prepare('DELETE FROM group_invites WHERE group_id = ? AND code = ?')
+    await env.DB.prepare('DELETE FROM group_invites WHERE group_id = ? AND code = ?')
       .bind(gid, code)
       .run();
     return jsonStatus({ ok: true }, 200);
@@ -115,8 +114,9 @@ export async function dispatchInviteByCode(ctx: RouteCtx): Promise<Response | nu
       return jsonStatus({ error: 'invite exhausted' }, 410);
     }
 
-    const existing = await env.DB
-      .prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?')
+    const existing = await env.DB.prepare(
+      'SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?',
+    )
       .bind(invite.groupId, session.user.id)
       .first();
     if (existing) {
@@ -133,8 +133,7 @@ export async function dispatchInviteByCode(ctx: RouteCtx): Promise<Response | nu
       stablePrefs: null,
     });
     await dbi.groupInvites.incrementUseCount(parsed.data.code);
-    await env.DB
-      .prepare('UPDATE groups SET member_count = member_count + 1 WHERE id = ?')
+    await env.DB.prepare('UPDATE groups SET member_count = member_count + 1 WHERE id = ?')
       .bind(invite.groupId)
       .run();
 

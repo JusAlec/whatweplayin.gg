@@ -60,7 +60,9 @@ export default function WhosPlayingMinimal() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Your groups</h1>
-        <a href="/signin" className="text-sm text-muted hover:text-text">Sign out</a>
+        <a href="/signin" className="text-sm text-muted hover:text-text">
+          Sign out
+        </a>
       </header>
 
       {error && (

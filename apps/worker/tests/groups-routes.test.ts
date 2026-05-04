@@ -18,8 +18,13 @@ beforeEach(async () => {
   ]);
   const now = new Date().toISOString();
   await db().users.insert({
-    id: 'u_alec', email: 'alec@test.co', emailVerified: true, displayName: 'Alec',
-    avatarUrl: null, createdAt: now, updatedAt: now,
+    id: 'u_alec',
+    email: 'alec@test.co',
+    emailVerified: true,
+    displayName: 'Alec',
+    avatarUrl: null,
+    createdAt: now,
+    updatedAt: now,
   });
   alecSessionId = await createSessionForUser(env.DB, 'u_alec');
 });
@@ -85,7 +90,9 @@ describe('GET /api/groups → list user groups', () => {
     const res = await SELF.fetch('https://x/api/groups', {
       headers: { cookie: `wwp_session=${alecSessionId}` },
     });
-    const body = (await res.json()) as { groups: Array<{ id: string; displayName: string; role: string }> };
+    const body = (await res.json()) as {
+      groups: Array<{ id: string; displayName: string; role: string }>;
+    };
     expect(body.groups.length).toBe(1);
     expect(body.groups[0]!.id).toBe(created.id);
     expect(body.groups[0]!.role).toBe('creator');
@@ -124,8 +131,13 @@ describe('GET /api/groups/:gid', () => {
 
     const now = new Date().toISOString();
     await db().users.insert({
-      id: 'u_intruder', email: 'i@test.co', emailVerified: true, displayName: 'Intruder',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u_intruder',
+      email: 'i@test.co',
+      emailVerified: true,
+      displayName: 'Intruder',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     const intruderSession = await createSessionForUser(env.DB, 'u_intruder');
 
@@ -169,12 +181,21 @@ describe('PATCH /api/groups/:gid', () => {
 
     const now = new Date().toISOString();
     await db().users.insert({
-      id: 'u_mike', email: 'mike@test.co', emailVerified: true, displayName: 'Mike',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u_mike',
+      email: 'mike@test.co',
+      emailVerified: true,
+      displayName: 'Mike',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     await db().groupMembers.insert({
-      groupId: created.id, userId: 'u_mike', role: 'member',
-      joinedAt: now, weight: 1.0, stablePrefs: null,
+      groupId: created.id,
+      userId: 'u_mike',
+      role: 'member',
+      joinedAt: now,
+      weight: 1.0,
+      stablePrefs: null,
     });
     const mikeSession = await createSessionForUser(env.DB, 'u_mike');
 
@@ -216,12 +237,21 @@ describe('DELETE /api/groups/:gid', () => {
 
     const now = new Date().toISOString();
     await db().users.insert({
-      id: 'u_x', email: 'x@test.co', emailVerified: true, displayName: 'X',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u_x',
+      email: 'x@test.co',
+      emailVerified: true,
+      displayName: 'X',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     await db().groupMembers.insert({
-      groupId: created.id, userId: 'u_x', role: 'member',
-      joinedAt: now, weight: 1.0, stablePrefs: null,
+      groupId: created.id,
+      userId: 'u_x',
+      role: 'member',
+      joinedAt: now,
+      weight: 1.0,
+      stablePrefs: null,
     });
     const xSession = await createSessionForUser(env.DB, 'u_x');
 
@@ -244,12 +274,21 @@ describe('POST /api/groups/:gid/leave', () => {
 
     const now = new Date().toISOString();
     await db().users.insert({
-      id: 'u_mike', email: 'm@test.co', emailVerified: true, displayName: 'M',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u_mike',
+      email: 'm@test.co',
+      emailVerified: true,
+      displayName: 'M',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     await db().groupMembers.insert({
-      groupId: created.id, userId: 'u_mike', role: 'member',
-      joinedAt: now, weight: 1.0, stablePrefs: null,
+      groupId: created.id,
+      userId: 'u_mike',
+      role: 'member',
+      joinedAt: now,
+      weight: 1.0,
+      stablePrefs: null,
     });
     const mikeSession = await createSessionForUser(env.DB, 'u_mike');
 

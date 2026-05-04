@@ -12,9 +12,7 @@ export default function SignInForm() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Sign in</h1>
-      <p className="text-muted text-sm">
-        Sign in with Steam to find games to play together.
-      </p>
+      <p className="text-muted text-sm">Sign in with Steam to find games to play together.</p>
       <button
         onClick={startSteam}
         disabled={busy}

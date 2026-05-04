@@ -16,8 +16,9 @@ export async function dispatchMe(ctx: RouteCtx): Promise<Response | null> {
 
   // GET /api/me
   if (parts.length === 1 && request.method === 'GET') {
-    const oauthRows = await env.DB
-      .prepare('SELECT provider, provider_user_id, provider_data FROM oauth_accounts WHERE user_id = ?')
+    const oauthRows = await env.DB.prepare(
+      'SELECT provider, provider_user_id, provider_data FROM oauth_accounts WHERE user_id = ?',
+    )
       .bind(session.user.id)
       .all();
     const linkedAccounts = (oauthRows.results as Record<string, unknown>[]).map((r) => ({

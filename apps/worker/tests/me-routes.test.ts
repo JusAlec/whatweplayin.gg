@@ -16,8 +16,13 @@ beforeEach(async () => {
   ]);
   const now = new Date().toISOString();
   await db().users.insert({
-    id: 'u1', email: 'a@b.co', emailVerified: true, displayName: 'A',
-    avatarUrl: 'https://avatar.png', createdAt: now, updatedAt: now,
+    id: 'u1',
+    email: 'a@b.co',
+    emailVerified: true,
+    displayName: 'A',
+    avatarUrl: 'https://avatar.png',
+    createdAt: now,
+    updatedAt: now,
   });
   sessionId = await createSessionForUser(env.DB, 'u1');
 });
@@ -28,18 +33,23 @@ describe('GET /api/me', () => {
       headers: { cookie: `wwp_session=${sessionId}` },
     });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { user: { id: string; email: string }; linkedAccounts: unknown[] };
+    const body = (await res.json()) as {
+      user: { id: string; email: string };
+      linkedAccounts: unknown[];
+    };
     expect(body.user.id).toBe('u1');
     expect(body.linkedAccounts).toEqual([]);
   });
 
   test('returns linked Steam account when present', async () => {
-    await env.DB
-      .prepare(
-        'INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, provider_data, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      )
+    await env.DB.prepare(
+      'INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, provider_data, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    )
       .bind(
-        'oa1', 'u1', 'steam', '76561198000000001',
+        'oa1',
+        'u1',
+        'steam',
+        '76561198000000001',
         JSON.stringify({ personaname: 'TestUser' }),
         new Date().toISOString(),
       )
@@ -48,7 +58,9 @@ describe('GET /api/me', () => {
     const res = await SELF.fetch('https://x/api/me', {
       headers: { cookie: `wwp_session=${sessionId}` },
     });
-    const body = (await res.json()) as { linkedAccounts: Array<{ provider: string; providerUserId: string }> };
+    const body = (await res.json()) as {
+      linkedAccounts: Array<{ provider: string; providerUserId: string }>;
+    };
     expect(body.linkedAccounts.length).toBe(1);
     expect(body.linkedAccounts[0]!.provider).toBe('steam');
   });

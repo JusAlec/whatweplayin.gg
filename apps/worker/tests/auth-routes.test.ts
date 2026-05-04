@@ -19,8 +19,7 @@ describe('POST /api/auth/magic/request', () => {
       body: JSON.stringify({ email: 'new@test.co' }),
     });
     expect(res.status).toBe(200);
-    const row = await env.DB
-      .prepare('SELECT * FROM magic_link_tokens WHERE email = ?')
+    const row = await env.DB.prepare('SELECT * FROM magic_link_tokens WHERE email = ?')
       .bind('new@test.co')
       .first();
     expect(row).not.toBeNull();
@@ -39,31 +38,34 @@ describe('POST /api/auth/magic/request', () => {
 describe('GET /api/auth/callback/magic', () => {
   test('valid token creates user + session, sets cookie, redirects to /who', async () => {
     const token = 'a'.repeat(64);
-    await env.DB
-      .prepare(
-        'INSERT INTO magic_link_tokens (token, email, expires_at, created_at) VALUES (?, ?, ?, ?)',
-      )
+    await env.DB.prepare(
+      'INSERT INTO magic_link_tokens (token, email, expires_at, created_at) VALUES (?, ?, ?, ?)',
+    )
       .bind(
-        token, 'new@test.co',
+        token,
+        'new@test.co',
         new Date(Date.now() + 600_000).toISOString(),
         new Date().toISOString(),
       )
       .run();
 
-    const res = await SELF.fetch(`https://x/api/auth/callback/magic?token=${token}`, { redirect: 'manual' });
+    const res = await SELF.fetch(`https://x/api/auth/callback/magic?token=${token}`, {
+      redirect: 'manual',
+    });
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toBe('/who');
     expect(res.headers.get('set-cookie')).toContain('wwp_session=');
 
-    const user = await env.DB
-      .prepare('SELECT * FROM users WHERE email = ?')
+    const user = await env.DB.prepare('SELECT * FROM users WHERE email = ?')
       .bind('new@test.co')
       .first();
     expect(user).not.toBeNull();
   });
 
   test('invalid token returns 410', async () => {
-    const res = await SELF.fetch('https://x/api/auth/callback/magic?token=nope', { redirect: 'manual' });
+    const res = await SELF.fetch('https://x/api/auth/callback/magic?token=nope', {
+      redirect: 'manual',
+    });
     expect(res.status).toBe(410);
   });
 });
@@ -93,7 +95,7 @@ describe('POST /api/auth/magic/request with Resend', () => {
       body: JSON.stringify({ email: 'dev@test.co' }),
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { ok: boolean; devToken?: string };
+    const body = (await res.json()) as { ok: boolean; devToken?: string };
     expect(body.ok).toBe(true);
     expect(body.devToken).toMatch(/^[a-f0-9]{64}$/);
   });

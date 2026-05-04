@@ -63,7 +63,9 @@ export default function GroupHomeMinimal({ gid }: Props) {
   if (error) {
     return (
       <div className="space-y-3">
-        <a href="/who" className="text-sm text-muted hover:text-text">← Back</a>
+        <a href="/who" className="text-sm text-muted hover:text-text">
+          ← Back
+        </a>
         <div className="rounded border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
           {error}
         </div>
@@ -80,7 +82,9 @@ export default function GroupHomeMinimal({ gid }: Props) {
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <a href="/who" className="text-sm text-muted hover:text-text">← All groups</a>
+        <a href="/who" className="text-sm text-muted hover:text-text">
+          ← All groups
+        </a>
         <h1 className="text-2xl font-semibold">{group.displayName}</h1>
         <p className="text-xs text-muted">
           {group.memberCount} member{group.memberCount === 1 ? '' : 's'}
@@ -107,10 +111,7 @@ export default function GroupHomeMinimal({ gid }: Props) {
             {invites.map((inv) => {
               const url = `${origin}/invite/${inv.code}`;
               return (
-                <li
-                  key={inv.code}
-                  className="rounded border border-border bg-panel p-3 text-sm"
-                >
+                <li key={inv.code} className="rounded border border-border bg-panel p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <code className="break-all text-xs">{url}</code>
                     <button

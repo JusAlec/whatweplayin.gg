@@ -1,8 +1,5 @@
 import { test, expect, describe } from 'vitest';
-import {
-  buildSteamLoginUrl,
-  verifySteamOpenIDResponse,
-} from '../src/auth/steam-openid.js';
+import { buildSteamLoginUrl, verifySteamOpenIDResponse } from '../src/auth/steam-openid.js';
 
 describe('buildSteamLoginUrl', () => {
   test('produces a valid Steam OpenID URL', () => {
@@ -16,9 +13,7 @@ describe('buildSteamLoginUrl', () => {
     // Node encodes both. Decode and parse to be runtime-agnostic.
     const params = new URL(url).searchParams;
     expect(params.get('openid.realm')).toBe('https://whatweplayin.gg');
-    expect(params.get('openid.return_to')).toBe(
-      'https://whatweplayin.gg/api/auth/callback/steam',
-    );
+    expect(params.get('openid.return_to')).toBe('https://whatweplayin.gg/api/auth/callback/steam');
   });
 });
 
@@ -27,7 +22,8 @@ describe('verifySteamOpenIDResponse', () => {
     const callback = new URL(
       'https://whatweplayin.gg/api/auth/callback/steam?openid.mode=id_res&openid.claimed_id=https://steamcommunity.com/openid/id/76561198000000001&openid.identity=https://steamcommunity.com/openid/id/76561198000000001&openid.return_to=https://whatweplayin.gg/api/auth/callback/steam',
     );
-    const fakeFetch = async () => new Response('ns:http://specs.openid.net/auth/2.0\nis_valid:true');
+    const fakeFetch = async () =>
+      new Response('ns:http://specs.openid.net/auth/2.0\nis_valid:true');
     const result = await verifySteamOpenIDResponse(callback, fakeFetch as typeof fetch);
     expect(result).toBe('76561198000000001');
   });

@@ -53,8 +53,7 @@ export async function verifySteamOpenIDResponse(
   return body.includes('is_valid:true') ? steamId64 : null;
 }
 
-const STEAM_PROFILE_URL =
-  'https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/';
+const STEAM_PROFILE_URL = 'https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/';
 
 export interface SteamProfileResponse {
   steamid: string;

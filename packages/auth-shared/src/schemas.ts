@@ -16,10 +16,9 @@ export const ScoringWeightsSchema = z
     sessionFit: z.number().min(0).max(1),
     novelty: z.number().min(0).max(1),
   })
-  .refine(
-    (w) => Math.abs(w.preferenceMatch + w.groupFit + w.sessionFit + w.novelty - 1) <= 0.001,
-    { message: 'scoringWeights must sum to 1.0 (±0.001)' },
-  );
+  .refine((w) => Math.abs(w.preferenceMatch + w.groupFit + w.sessionFit + w.novelty - 1) <= 0.001, {
+    message: 'scoringWeights must sum to 1.0 (±0.001)',
+  });
 
 export const CreateGroupRequestSchema = z.object({
   displayName: z.string().trim().min(1).max(50),

@@ -1,10 +1,7 @@
 import { ulid } from 'ulid';
 import { z } from 'zod';
 import { Db } from '../lib/d1-client.js';
-import {
-  generateMagicLinkToken,
-  validateMagicLinkToken,
-} from '../auth/magic-link.js';
+import { generateMagicLinkToken, validateMagicLinkToken } from '../auth/magic-link.js';
 import {
   createSessionForUser,
   sessionCookie,
@@ -107,8 +104,9 @@ export async function dispatchAuth(ctx: AuthCtx): Promise<Response | null> {
 
     const dbi = new Db(env.DB);
 
-    const existing = (await env.DB
-      .prepare('SELECT user_id FROM oauth_accounts WHERE provider = ? AND provider_user_id = ?')
+    const existing = (await env.DB.prepare(
+      'SELECT user_id FROM oauth_accounts WHERE provider = ? AND provider_user_id = ?',
+    )
       .bind('steam', steamId)
       .first()) as { user_id?: string } | null;
 
@@ -130,18 +128,10 @@ export async function dispatchAuth(ctx: AuthCtx): Promise<Response | null> {
         createdAt: now,
         updatedAt: now,
       });
-      await env.DB
-        .prepare(
-          'INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, provider_data, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-        )
-        .bind(
-          ulid(),
-          userId,
-          'steam',
-          steamId,
-          profile ? JSON.stringify(profile) : null,
-          now,
-        )
+      await env.DB.prepare(
+        'INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, provider_data, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+        .bind(ulid(), userId, 'steam', steamId, profile ? JSON.stringify(profile) : null, now)
         .run();
     }
 
@@ -170,7 +160,11 @@ export async function dispatchAuth(ctx: AuthCtx): Promise<Response | null> {
 }
 
 async function safeJson(req: Request): Promise<unknown> {
-  try { return await req.json(); } catch { return null; }
+  try {
+    return await req.json();
+  } catch {
+    return null;
+  }
 }
 
 function json(body: unknown, status = 200): Response {

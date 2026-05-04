@@ -75,7 +75,15 @@ class UsersTable {
       .prepare(
         'INSERT INTO users (id, email, email_verified, display_name, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       )
-      .bind(u.id, u.email, u.emailVerified ? 1 : 0, u.displayName, u.avatarUrl, u.createdAt, u.updatedAt)
+      .bind(
+        u.id,
+        u.email,
+        u.emailVerified ? 1 : 0,
+        u.displayName,
+        u.avatarUrl,
+        u.createdAt,
+        u.updatedAt,
+      )
       .run();
   }
 
@@ -145,7 +153,11 @@ class GroupMembersTable {
         'INSERT INTO group_members (group_id, user_id, role, joined_at, weight, stable_prefs) VALUES (?, ?, ?, ?, ?, ?)',
       )
       .bind(
-        m.groupId, m.userId, m.role, m.joinedAt, m.weight,
+        m.groupId,
+        m.userId,
+        m.role,
+        m.joinedAt,
+        m.weight,
         m.stablePrefs ? JSON.stringify(m.stablePrefs) : null,
       )
       .run();
@@ -173,7 +185,10 @@ class GroupInvitesTable {
   }
 
   async getByCode(code: string): Promise<GroupInvite | null> {
-    const row = await this.db.prepare('SELECT * FROM group_invites WHERE code = ?').bind(code).first();
+    const row = await this.db
+      .prepare('SELECT * FROM group_invites WHERE code = ?')
+      .bind(code)
+      .first();
     return row ? rowToInvite(row as Record<string, unknown>) : null;
   }
 

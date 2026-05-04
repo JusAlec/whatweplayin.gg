@@ -24,8 +24,13 @@ describe('Db.users', () => {
   test('insert + getById round-trips', async () => {
     const now = new Date().toISOString();
     await db().users.insert({
-      id: 'u1', email: 'a@b.co', emailVerified: true, displayName: 'Alec',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u1',
+      email: 'a@b.co',
+      emailVerified: true,
+      displayName: 'Alec',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     const u = await db().users.getById('u1');
     expect(u?.email).toBe('a@b.co');
@@ -43,13 +48,22 @@ describe('Db.groups', () => {
   test('create + getById', async () => {
     const now = new Date().toISOString();
     await db().users.insert({
-      id: 'u1', email: 'a@b.co', emailVerified: true, displayName: 'A',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u1',
+      email: 'a@b.co',
+      emailVerified: true,
+      displayName: 'A',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     await db().groups.insert({
-      id: 'g1', displayName: 'RIVALS', creatorId: 'u1',
+      id: 'g1',
+      displayName: 'RIVALS',
+      creatorId: 'u1',
       scoringWeights: { preferenceMatch: 0.4, groupFit: 0.25, sessionFit: 0.2, novelty: 0.15 },
-      customCompletionGoals: null, createdAt: now, memberCount: 1,
+      customCompletionGoals: null,
+      createdAt: now,
+      memberCount: 1,
     });
     const g = await db().groups.getById('g1');
     expect(g?.displayName).toBe('RIVALS');
@@ -62,8 +76,13 @@ describe('Db.sessions', () => {
     const now = new Date().toISOString();
     const exp = new Date(Date.now() + 86_400_000).toISOString();
     await db().users.insert({
-      id: 'u1', email: 'a@b.co', emailVerified: true, displayName: 'A',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u1',
+      email: 'a@b.co',
+      emailVerified: true,
+      displayName: 'A',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     await db().sessions.insert({ id: 's1', userId: 'u1', expiresAt: exp, createdAt: now });
     const s = await db().sessions.getById('s1');
@@ -74,8 +93,13 @@ describe('Db.sessions', () => {
     const now = new Date().toISOString();
     const exp = new Date(Date.now() + 86_400_000).toISOString();
     await db().users.insert({
-      id: 'u1', email: 'a@b.co', emailVerified: true, displayName: 'A',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u1',
+      email: 'a@b.co',
+      emailVerified: true,
+      displayName: 'A',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     await db().sessions.insert({ id: 's1', userId: 'u1', expiresAt: exp, createdAt: now });
     await db().sessions.insert({ id: 's2', userId: 'u1', expiresAt: exp, createdAt: now });
@@ -89,17 +113,30 @@ describe('Db.groupMembers', () => {
   test('insert + listByGroup', async () => {
     const now = new Date().toISOString();
     await db().users.insert({
-      id: 'u1', email: 'a@b.co', emailVerified: true, displayName: 'A',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u1',
+      email: 'a@b.co',
+      emailVerified: true,
+      displayName: 'A',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     await db().groups.insert({
-      id: 'g1', displayName: 'g', creatorId: 'u1',
+      id: 'g1',
+      displayName: 'g',
+      creatorId: 'u1',
       scoringWeights: { preferenceMatch: 0.4, groupFit: 0.25, sessionFit: 0.2, novelty: 0.15 },
-      customCompletionGoals: null, createdAt: now, memberCount: 1,
+      customCompletionGoals: null,
+      createdAt: now,
+      memberCount: 1,
     });
     await db().groupMembers.insert({
-      groupId: 'g1', userId: 'u1', role: 'creator', joinedAt: now,
-      weight: 1.0, stablePrefs: null,
+      groupId: 'g1',
+      userId: 'u1',
+      role: 'creator',
+      joinedAt: now,
+      weight: 1.0,
+      stablePrefs: null,
     });
     const members = await db().groupMembers.listByGroup('g1');
     expect(members.length).toBe(1);
@@ -112,17 +149,31 @@ describe('Db.groupInvites', () => {
     const now = new Date().toISOString();
     const exp = new Date(Date.now() + 7 * 86_400_000).toISOString();
     await db().users.insert({
-      id: 'u1', email: 'a@b.co', emailVerified: true, displayName: 'A',
-      avatarUrl: null, createdAt: now, updatedAt: now,
+      id: 'u1',
+      email: 'a@b.co',
+      emailVerified: true,
+      displayName: 'A',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
     });
     await db().groups.insert({
-      id: 'g1', displayName: 'g', creatorId: 'u1',
+      id: 'g1',
+      displayName: 'g',
+      creatorId: 'u1',
       scoringWeights: { preferenceMatch: 0.4, groupFit: 0.25, sessionFit: 0.2, novelty: 0.15 },
-      customCompletionGoals: null, createdAt: now, memberCount: 1,
+      customCompletionGoals: null,
+      createdAt: now,
+      memberCount: 1,
     });
     await db().groupInvites.insert({
-      code: 'aBcDeF12', groupId: 'g1', createdBy: 'u1',
-      expiresAt: exp, maxUses: 0, useCount: 0, createdAt: now,
+      code: 'aBcDeF12',
+      groupId: 'g1',
+      createdBy: 'u1',
+      expiresAt: exp,
+      maxUses: 0,
+      useCount: 0,
+      createdAt: now,
     });
     const inv = await db().groupInvites.getByCode('aBcDeF12');
     expect(inv?.groupId).toBe('g1');

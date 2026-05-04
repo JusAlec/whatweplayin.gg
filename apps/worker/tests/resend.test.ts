@@ -27,9 +27,7 @@ describe('sendMagicLinkEmail', () => {
   });
 
   test('throws on non-2xx response', async () => {
-    const fakeFetch = vi.fn(
-      async () => new Response('forbidden', { status: 403 }),
-    );
+    const fakeFetch = vi.fn(async () => new Response('forbidden', { status: 403 }));
     await expect(
       sendMagicLinkEmail('bad_key', 'a@b.co', 'https://x', fakeFetch as typeof fetch),
     ).rejects.toThrow();
