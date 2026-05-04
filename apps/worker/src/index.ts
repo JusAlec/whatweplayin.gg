@@ -1,4 +1,5 @@
 import { dispatchAuth } from './routes/auth.js';
+import { dispatchGroups } from './routes/groups.js';
 import { dispatchKvCrud } from './routes/kv-crud.js';
 import { dispatchVotes } from './routes/votes.js';
 import { dispatchSessions } from './routes/sessions.js';
@@ -35,6 +36,8 @@ export default {
         baseUrl: env.BETTER_AUTH_URL ?? `${url.protocol}//${url.host}`,
       });
       if (authResp) return withCors(authResp);
+      const groupsResp = await dispatchGroups({ request, env, parts: apiParts });
+      if (groupsResp) return withCors(groupsResp);
       return withCors(new Response('not found', { status: 404 }));
     }
 
