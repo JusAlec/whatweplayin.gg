@@ -1,5 +1,10 @@
 import { test, expect, describe, vi, beforeEach } from 'vitest';
-import { getOwnedGames, SteamPrivateProfileError } from '../src/lib/steam-api.js';
+import {
+  getOwnedGames,
+  SteamPrivateProfileError,
+  fetchAppDetails,
+  fetchAppReviews,
+} from '../src/lib/steam-api.js';
 
 describe('getOwnedGames', () => {
   test('returns parsed games array on success', async () => {
@@ -76,5 +81,147 @@ describe('getOwnedGames', () => {
     );
     const [g] = await getOwnedGames('k', '7', fakeFetch as typeof fetch);
     expect(g!.rtimeLastPlayed).toBeNull();
+  });
+});
+
+describe('fetchAppDetails', () => {
+  test('parses categories, type, header_image for a game', async () => {
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            '730': {
+              success: true,
+              data: {
+                type: 'game',
+                name: 'Counter-Strike 2',
+                header_image: 'https://cdn.akamai.steamstatic.com/steam/apps/730/header.jpg',
+                categories: [
+                  { id: 1, description: 'Multi-player' },
+                  { id: 49, description: 'PvP' },
+                  { id: 36, description: 'Online PvP' },
+                ],
+                release_date: { coming_soon: false, date: '21 Aug, 2012' },
+              },
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    const result = await fetchAppDetails(730, fakeFetch as typeof fetch);
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe('game');
+    expect(result!.name).toBe('Counter-Strike 2');
+    expect(result!.headerImage).toContain('header.jpg');
+    expect(result!.hasSinglePlayer).toBe(false);
+    expect(result!.hasCoop).toBe(false);
+    expect(result!.hasPvp).toBe(true);
+  });
+
+  test('returns null when type is not game (DLC, soundtrack)', async () => {
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            '12345': {
+              success: true,
+              data: { type: 'dlc', name: 'Some DLC', header_image: '', categories: [] },
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    const result = await fetchAppDetails(12345, fakeFetch as typeof fetch);
+    expect(result).toBeNull();
+  });
+
+  test('returns null when success is false', async () => {
+    const fakeFetch = vi.fn(
+      async () => new Response(JSON.stringify({ '99999': { success: false } }), { status: 200 }),
+    );
+    const result = await fetchAppDetails(99999, fakeFetch as typeof fetch);
+    expect(result).toBeNull();
+  });
+
+  test('detects co-op + single-player categories', async () => {
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            '892970': {
+              success: true,
+              data: {
+                type: 'game',
+                name: 'Valheim',
+                header_image: '',
+                categories: [
+                  { id: 1, description: 'Multi-player' },
+                  { id: 9, description: 'Co-op' },
+                  { id: 38, description: 'Online Co-op' },
+                  { id: 2, description: 'Single-player' },
+                ],
+              },
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    const result = await fetchAppDetails(892970, fakeFetch as typeof fetch);
+    expect(result!.hasCoop).toBe(true);
+    expect(result!.hasSinglePlayer).toBe(true);
+    expect(result!.hasPvp).toBe(false);
+  });
+});
+
+describe('fetchAppReviews', () => {
+  test('parses query_summary into review fields', async () => {
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: 1,
+            query_summary: {
+              review_score: 9,
+              review_score_desc: 'Overwhelmingly Positive',
+              total_positive: 950000,
+              total_reviews: 1000000,
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    const result = await fetchAppReviews(730, fakeFetch as typeof fetch);
+    expect(result).toEqual({
+      score: 9,
+      scoreDesc: 'Overwhelmingly Positive',
+      pctPositive: 95,
+      count: 1000000,
+    });
+  });
+
+  test('returns null when total_reviews is 0 (no reviews)', async () => {
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: 1,
+            query_summary: {
+              review_score: 0,
+              review_score_desc: 'No user reviews',
+              total_positive: 0,
+              total_reviews: 0,
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    const result = await fetchAppReviews(99999, fakeFetch as typeof fetch);
+    expect(result).toBeNull();
+  });
+
+  test('returns null on HTTP error', async () => {
+    const fakeFetch = vi.fn(async () => new Response('error', { status: 500 }));
+    const result = await fetchAppReviews(730, fakeFetch as typeof fetch);
+    expect(result).toBeNull();
   });
 });
