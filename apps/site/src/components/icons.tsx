@@ -47,3 +47,31 @@ export function ArrowLeftIcon({ size = 16, className }: IconProps) {
     </svg>
   );
 }
+
+export function PlusIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg {...baseProps(size, className)}>
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </svg>
+  );
+}
+
+export function LogInIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg {...baseProps(size, className)}>
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+      <polyline points="10 17 15 12 10 7" />
+      <line x1="15" x2="3" y1="12" y2="12" />
+    </svg>
+  );
+}
+
+export function CloseIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg {...baseProps(size, className)}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
+}
