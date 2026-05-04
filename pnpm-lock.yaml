@@ -95,6 +95,19 @@ importers:
         specifier: ^3.50.0
         version: 3.114.17(@cloudflare/workers-types@4.20260503.1)
 
+  packages/auth-shared:
+    dependencies:
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.4.0
+        version: 1.6.1(@types/node@25.6.0)
+
   packages/recommender:
     devDependencies:
       '@vitest/coverage-v8':
