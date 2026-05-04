@@ -32,10 +32,12 @@ jobs:
 
       - name: D1 migration syntax check
         run: |
+          # Apply all migrations in a single session so later migrations can
+          # reference tables/columns from earlier ones (FK refs, ALTER TABLE, etc.).
           for f in apps/worker/migrations/*.sql; do
-            echo "Validating $f"
-            sqlite3 :memory: < "$f" || exit 1
+            echo "Including $f"
           done
+          cat apps/worker/migrations/*.sql | sqlite3 :memory: || exit 1
 
       - name: Typecheck
         run: pnpm -r typecheck
