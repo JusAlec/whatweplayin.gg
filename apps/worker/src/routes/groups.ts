@@ -130,6 +130,44 @@ export async function dispatchGroups(ctx: RouteCtx): Promise<Response | null> {
     return jsonStatus({ ok: true }, 200);
   }
 
+  // DELETE /api/groups/:gid → creator only
+  if (parts.length === 2 && request.method === 'DELETE') {
+    const gid = parts[1]!;
+    const memberRow = (await env.DB
+      .prepare('SELECT role FROM group_members WHERE group_id = ? AND user_id = ?')
+      .bind(gid, session.user.id)
+      .first()) as { role?: string } | null;
+    if (!memberRow) return jsonStatus({ error: 'forbidden' }, 403);
+    if (memberRow.role !== 'creator') return jsonStatus({ error: 'forbidden — creator only' }, 403);
+
+    await env.DB.prepare('DELETE FROM groups WHERE id = ?').bind(gid).run();
+    // group_members + group_invites cascade via FK ON DELETE CASCADE
+    return jsonStatus({ ok: true }, 200);
+  }
+
+  // POST /api/groups/:gid/leave
+  if (parts.length === 3 && parts[2] === 'leave' && request.method === 'POST') {
+    const gid = parts[1]!;
+    const memberRow = (await env.DB
+      .prepare('SELECT role FROM group_members WHERE group_id = ? AND user_id = ?')
+      .bind(gid, session.user.id)
+      .first()) as { role?: string } | null;
+    if (!memberRow) return jsonStatus({ error: 'not a member' }, 403);
+    if (memberRow.role === 'creator') {
+      return jsonStatus({ error: 'creators cannot leave; delete the group instead' }, 409);
+    }
+
+    await env.DB
+      .prepare('DELETE FROM group_members WHERE group_id = ? AND user_id = ?')
+      .bind(gid, session.user.id)
+      .run();
+    await env.DB
+      .prepare('UPDATE groups SET member_count = member_count - 1 WHERE id = ?')
+      .bind(gid)
+      .run();
+    return jsonStatus({ ok: true }, 200);
+  }
+
   return null;
 }
 

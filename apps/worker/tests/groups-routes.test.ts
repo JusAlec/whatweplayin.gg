@@ -186,3 +186,94 @@ describe('PATCH /api/groups/:gid', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('DELETE /api/groups/:gid', () => {
+  test('creator can delete group and cascade members + invites', async () => {
+    const create = await SELF.fetch('https://x/api/groups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSessionId}` },
+      body: JSON.stringify({ displayName: 'ToDelete' }),
+    });
+    const created = (await create.json()) as { id: string };
+
+    const res = await SELF.fetch(`https://x/api/groups/${created.id}`, {
+      method: 'DELETE',
+      headers: { cookie: `wwp_session=${alecSessionId}` },
+    });
+    expect(res.status).toBe(200);
+    expect(await db().groups.getById(created.id)).toBeNull();
+    const remainingMembers = await db().groupMembers.listByGroup(created.id);
+    expect(remainingMembers.length).toBe(0);
+  });
+
+  test('non-creator gets 403', async () => {
+    const create = await SELF.fetch('https://x/api/groups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSessionId}` },
+      body: JSON.stringify({ displayName: 'RIVALS' }),
+    });
+    const created = (await create.json()) as { id: string };
+
+    const now = new Date().toISOString();
+    await db().users.insert({
+      id: 'u_x', email: 'x@test.co', emailVerified: true, displayName: 'X',
+      avatarUrl: null, createdAt: now, updatedAt: now,
+    });
+    await db().groupMembers.insert({
+      groupId: created.id, userId: 'u_x', role: 'member',
+      joinedAt: now, weight: 1.0, stablePrefs: null,
+    });
+    const xSession = await createSessionForUser(env.DB, 'u_x');
+
+    const res = await SELF.fetch(`https://x/api/groups/${created.id}`, {
+      method: 'DELETE',
+      headers: { cookie: `wwp_session=${xSession}` },
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('POST /api/groups/:gid/leave', () => {
+  test('member can leave', async () => {
+    const create = await SELF.fetch('https://x/api/groups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSessionId}` },
+      body: JSON.stringify({ displayName: 'RIVALS' }),
+    });
+    const created = (await create.json()) as { id: string };
+
+    const now = new Date().toISOString();
+    await db().users.insert({
+      id: 'u_mike', email: 'm@test.co', emailVerified: true, displayName: 'M',
+      avatarUrl: null, createdAt: now, updatedAt: now,
+    });
+    await db().groupMembers.insert({
+      groupId: created.id, userId: 'u_mike', role: 'member',
+      joinedAt: now, weight: 1.0, stablePrefs: null,
+    });
+    const mikeSession = await createSessionForUser(env.DB, 'u_mike');
+
+    const res = await SELF.fetch(`https://x/api/groups/${created.id}/leave`, {
+      method: 'POST',
+      headers: { cookie: `wwp_session=${mikeSession}` },
+    });
+    expect(res.status).toBe(200);
+    const remaining = await db().groupMembers.listByGroup(created.id);
+    expect(remaining.find((m) => m.userId === 'u_mike')).toBeUndefined();
+  });
+
+  test('creator cannot leave (must delete instead)', async () => {
+    const create = await SELF.fetch('https://x/api/groups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSessionId}` },
+      body: JSON.stringify({ displayName: 'RIVALS' }),
+    });
+    const created = (await create.json()) as { id: string };
+
+    const res = await SELF.fetch(`https://x/api/groups/${created.id}/leave`, {
+      method: 'POST',
+      headers: { cookie: `wwp_session=${alecSessionId}` },
+    });
+    expect(res.status).toBe(409);
+  });
+});
