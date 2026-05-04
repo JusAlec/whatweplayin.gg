@@ -172,3 +172,31 @@ describe('POST /api/invites/accept', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('GET /api/invites/:code (preview)', () => {
+  test('returns group preview for valid code (no auth required)', async () => {
+    const create = await SELF.fetch(`https://x/api/groups/${groupId}/invites`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSession}` },
+      body: JSON.stringify({}),
+    });
+    const { code } = (await create.json()) as { code: string };
+
+    const res = await SELF.fetch(`https://x/api/invites/${code}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { groupName: string; memberCount: number; expiresAt: string };
+    expect(body.groupName).toBe('RIVALS');
+    expect(body.memberCount).toBe(1);
+  });
+
+  test('expired invite returns 410', async () => {
+    await env.DB
+      .prepare(
+        'INSERT INTO group_invites (code, group_id, created_by, expires_at, max_uses, use_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .bind('exp9', groupId, 'u_alec', '2020-01-01T00:00:00Z', 0, 0, '2020-01-01T00:00:00Z')
+      .run();
+    const res = await SELF.fetch('https://x/api/invites/exp9');
+    expect(res.status).toBe(410);
+  });
+});
