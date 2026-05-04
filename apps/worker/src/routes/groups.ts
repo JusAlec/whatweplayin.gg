@@ -57,6 +57,45 @@ export async function dispatchGroups(ctx: RouteCtx): Promise<Response | null> {
     return jsonStatus({ id, displayName: parsed.data.displayName }, 200);
   }
 
+  // GET /api/groups → list user's groups
+  if (parts.length === 1 && request.method === 'GET') {
+    const result = await env.DB
+      .prepare(
+        `SELECT g.id, g.display_name, g.created_at, gm.role
+           FROM groups g
+           JOIN group_members gm ON gm.group_id = g.id
+          WHERE gm.user_id = ?
+          ORDER BY gm.joined_at DESC`,
+      )
+      .bind(session.user.id)
+      .all();
+    const groups = (result.results as Record<string, unknown>[]).map((r) => ({
+      id: r.id as string,
+      displayName: r.display_name as string,
+      createdAt: r.created_at as string,
+      role: r.role as string,
+    }));
+    return jsonStatus({ groups }, 200);
+  }
+
+  // GET /api/groups/:gid
+  if (parts.length === 2 && request.method === 'GET') {
+    const gid = parts[1]!;
+    const dbi = new Db(env.DB);
+
+    const memberRow = await env.DB
+      .prepare('SELECT role FROM group_members WHERE group_id = ? AND user_id = ?')
+      .bind(gid, session.user.id)
+      .first();
+    if (!memberRow) return jsonStatus({ error: 'forbidden' }, 403);
+
+    const group = await dbi.groups.getById(gid);
+    if (!group) return jsonStatus({ error: 'not found' }, 404);
+
+    const members = await dbi.groupMembers.listByGroup(gid);
+    return jsonStatus({ group, members }, 200);
+  }
+
   return null;
 }
 

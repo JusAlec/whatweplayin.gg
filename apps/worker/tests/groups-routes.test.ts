@@ -63,3 +63,75 @@ describe('POST /api/groups', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('GET /api/groups → list user groups', () => {
+  test('returns empty list for new user', async () => {
+    const res = await SELF.fetch('https://x/api/groups', {
+      headers: { cookie: `wwp_session=${alecSessionId}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { groups: unknown[] };
+    expect(body.groups).toEqual([]);
+  });
+
+  test('returns groups user is a member of', async () => {
+    const create = await SELF.fetch('https://x/api/groups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSessionId}` },
+      body: JSON.stringify({ displayName: 'RIVALS' }),
+    });
+    const created = (await create.json()) as { id: string };
+
+    const res = await SELF.fetch('https://x/api/groups', {
+      headers: { cookie: `wwp_session=${alecSessionId}` },
+    });
+    const body = (await res.json()) as { groups: Array<{ id: string; displayName: string; role: string }> };
+    expect(body.groups.length).toBe(1);
+    expect(body.groups[0]!.id).toBe(created.id);
+    expect(body.groups[0]!.role).toBe('creator');
+  });
+});
+
+describe('GET /api/groups/:gid', () => {
+  test('returns group + members for a member', async () => {
+    const create = await SELF.fetch('https://x/api/groups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSessionId}` },
+      body: JSON.stringify({ displayName: 'RIVALS' }),
+    });
+    const created = (await create.json()) as { id: string };
+
+    const res = await SELF.fetch(`https://x/api/groups/${created.id}`, {
+      headers: { cookie: `wwp_session=${alecSessionId}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      group: { id: string; displayName: string };
+      members: Array<{ userId: string; role: string }>;
+    };
+    expect(body.group.displayName).toBe('RIVALS');
+    expect(body.members.length).toBe(1);
+    expect(body.members[0]!.role).toBe('creator');
+  });
+
+  test('returns 403 for non-member', async () => {
+    const create = await SELF.fetch('https://x/api/groups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSessionId}` },
+      body: JSON.stringify({ displayName: 'RIVALS' }),
+    });
+    const created = (await create.json()) as { id: string };
+
+    const now = new Date().toISOString();
+    await db().users.insert({
+      id: 'u_intruder', email: 'i@test.co', emailVerified: true, displayName: 'Intruder',
+      avatarUrl: null, createdAt: now, updatedAt: now,
+    });
+    const intruderSession = await createSessionForUser(env.DB, 'u_intruder');
+
+    const res = await SELF.fetch(`https://x/api/groups/${created.id}`, {
+      headers: { cookie: `wwp_session=${intruderSession}` },
+    });
+    expect(res.status).toBe(403);
+  });
+});
