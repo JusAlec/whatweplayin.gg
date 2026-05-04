@@ -3,6 +3,7 @@ import {
   computeThumbsScore,
   computeOwnershipScore,
   computeNoveltyScore,
+  rankByThumbs,
 } from '../src/v2-thumbs.js';
 
 describe('computeThumbsScore', () => {
@@ -139,5 +140,175 @@ describe('computeNoveltyScore', () => {
         now: NOW,
       }),
     ).toBe(1.0);
+  });
+});
+
+describe('rankByThumbs', () => {
+  const NOW = new Date('2026-05-04T00:00:00Z');
+  const WEIGHTS = { thumbs: 0.5, ownership: 0.3, novelty: 0.2 };
+
+  test('ranks games by composite score (descending)', () => {
+    const result = rankByThumbs({
+      group: { id: 'g1', size: 4 },
+      candidates: [
+        {
+          id: 'a',
+          name: 'Alpha',
+          steamReviewPctPositive: 80,
+          metadataSyncedAt: NOW.toISOString(),
+        },
+        {
+          id: 'b',
+          name: 'Beta',
+          steamReviewPctPositive: 90,
+          metadataSyncedAt: NOW.toISOString(),
+        },
+      ],
+      thumbs: new Map([
+        [
+          'a',
+          [
+            { userId: 'u1', vote: 1 },
+            { userId: 'u2', vote: 1 },
+          ],
+        ],
+        ['b', [{ userId: 'u1', vote: -1 }]],
+      ]),
+      ownership: new Map([
+        ['a', { ownerCount: 4, maxLastPlayed: null }],
+        ['b', { ownerCount: 2, maxLastPlayed: '2026-04-30T00:00:00Z' }],
+      ]),
+      weights: WEIGHTS,
+      now: NOW,
+    });
+
+    expect(result.picks.length).toBe(2);
+    expect(result.picks[0]!.gameId).toBe('a');
+    expect(result.picks[1]!.gameId).toBe('b');
+  });
+
+  test('emits cold-start flag when group has < 5 total thumbs', () => {
+    const result = rankByThumbs({
+      group: { id: 'g1', size: 4 },
+      candidates: [
+        {
+          id: 'a',
+          name: 'Alpha',
+          steamReviewPctPositive: 80,
+          metadataSyncedAt: NOW.toISOString(),
+        },
+      ],
+      thumbs: new Map(),
+      ownership: new Map([['a', { ownerCount: 1, maxLastPlayed: null }]]),
+      weights: WEIGHTS,
+      now: NOW,
+    });
+
+    expect(result.coldStart).toBe(true);
+    expect(result.picks[0]!.flags).toContain('cold-start');
+  });
+
+  test('higher Steam pct wins for tied scores (cold-start blend already favors Beta)', () => {
+    const result = rankByThumbs({
+      group: { id: 'g1', size: 4 },
+      candidates: [
+        {
+          id: 'a',
+          name: 'Alpha',
+          steamReviewPctPositive: 70,
+          metadataSyncedAt: NOW.toISOString(),
+        },
+        {
+          id: 'b',
+          name: 'Beta',
+          steamReviewPctPositive: 90,
+          metadataSyncedAt: NOW.toISOString(),
+        },
+      ],
+      thumbs: new Map(),
+      ownership: new Map([
+        ['a', { ownerCount: 2, maxLastPlayed: null }],
+        ['b', { ownerCount: 2, maxLastPlayed: null }],
+      ]),
+      weights: WEIGHTS,
+      now: NOW,
+    });
+    expect(result.picks[0]!.gameId).toBe('b');
+  });
+
+  test('emits never-played flag when maxLastPlayed is null', () => {
+    const result = rankByThumbs({
+      group: { id: 'g1', size: 4 },
+      candidates: [
+        {
+          id: 'a',
+          name: 'Alpha',
+          steamReviewPctPositive: null,
+          metadataSyncedAt: NOW.toISOString(),
+        },
+      ],
+      thumbs: new Map(),
+      ownership: new Map([['a', { ownerCount: 1, maxLastPlayed: null }]]),
+      weights: WEIGHTS,
+      now: NOW,
+    });
+    expect(result.picks[0]!.flags).toContain('never-played');
+  });
+
+  test('emits not-enriched flag when metadataSyncedAt is null', () => {
+    const result = rankByThumbs({
+      group: { id: 'g1', size: 4 },
+      candidates: [
+        { id: 'a', name: 'Alpha', steamReviewPctPositive: null, metadataSyncedAt: null },
+      ],
+      thumbs: new Map(),
+      ownership: new Map([['a', { ownerCount: 1, maxLastPlayed: '2026-04-01T00:00:00Z' }]]),
+      weights: WEIGHTS,
+      now: NOW,
+    });
+    expect(result.picks[0]!.flags).toContain('not-enriched');
+  });
+
+  test('emits low-confidence flag when game has 0-1 thumbs', () => {
+    const result = rankByThumbs({
+      group: { id: 'g1', size: 8 },
+      candidates: [
+        {
+          id: 'a',
+          name: 'Alpha',
+          steamReviewPctPositive: 80,
+          metadataSyncedAt: NOW.toISOString(),
+        },
+      ],
+      thumbs: new Map([['a', [{ userId: 'u1', vote: 1 }]]]),
+      ownership: new Map([['a', { ownerCount: 4, maxLastPlayed: null }]]),
+      weights: WEIGHTS,
+      now: NOW,
+    });
+    expect(result.picks[0]!.flags).toContain('low-confidence');
+  });
+
+  test('returns empty picks for empty candidates', () => {
+    const result = rankByThumbs({
+      group: { id: 'g1', size: 4 },
+      candidates: [],
+      thumbs: new Map(),
+      ownership: new Map(),
+      weights: WEIGHTS,
+      now: NOW,
+    });
+    expect(result.picks).toEqual([]);
+  });
+
+  test('echoes weights in result', () => {
+    const result = rankByThumbs({
+      group: { id: 'g1', size: 4 },
+      candidates: [],
+      thumbs: new Map(),
+      ownership: new Map(),
+      weights: { thumbs: 0.6, ownership: 0.2, novelty: 0.2 },
+      now: NOW,
+    });
+    expect(result.weightsUsed).toEqual({ thumbs: 0.6, ownership: 0.2, novelty: 0.2 });
   });
 });

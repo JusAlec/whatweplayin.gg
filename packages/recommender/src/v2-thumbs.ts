@@ -76,3 +76,79 @@ export function computeNoveltyScore(input: NoveltyScoreInput): number {
   if (daysSince <= 0) return 0;
   return Math.min(1, daysSince / NOVELTY_DECAY_DAYS);
 }
+
+export function rankByThumbs(input: RankInput): RankResult {
+  let totalGroupThumbs = 0;
+  for (const arr of input.thumbs.values()) {
+    totalGroupThumbs += arr.length;
+  }
+  const coldStart = totalGroupThumbs < COLD_START_THRESHOLD;
+
+  const picks: Array<{
+    gameId: string;
+    score: number;
+    breakdown: { thumbs: number; ownership: number; novelty: number };
+    flags: GameFlag[];
+    steamPct: number | null;
+    name: string;
+  }> = [];
+
+  for (const game of input.candidates) {
+    const gameThumbs = input.thumbs.get(game.id) ?? [];
+    const ownership = input.ownership.get(game.id) ?? { ownerCount: 0, maxLastPlayed: null };
+
+    const thumbsScore = computeThumbsScore({
+      groupSize: input.group.size,
+      gameThumbs,
+      totalGroupThumbs,
+      steamPctPositive: game.steamReviewPctPositive,
+    });
+    const ownershipScore = computeOwnershipScore({
+      ownerCount: ownership.ownerCount,
+      groupSize: input.group.size,
+    });
+    const noveltyScore = computeNoveltyScore({
+      maxLastPlayed: ownership.maxLastPlayed,
+      now: input.now,
+    });
+
+    const score =
+      input.weights.thumbs * thumbsScore +
+      input.weights.ownership * ownershipScore +
+      input.weights.novelty * noveltyScore;
+
+    const flags: GameFlag[] = [];
+    if (coldStart) flags.push('cold-start');
+    if (gameThumbs.length <= 1) flags.push('low-confidence');
+    if (game.metadataSyncedAt === null || game.metadataSyncedAt === '') flags.push('not-enriched');
+    if (ownership.maxLastPlayed === null) flags.push('never-played');
+
+    picks.push({
+      gameId: game.id,
+      score,
+      breakdown: { thumbs: thumbsScore, ownership: ownershipScore, novelty: noveltyScore },
+      flags,
+      steamPct: game.steamReviewPctPositive,
+      name: game.name,
+    });
+  }
+
+  picks.sort((a, b) => {
+    if (Math.abs(a.score - b.score) > TIE_EPSILON) return b.score - a.score;
+    const aPct = a.steamPct ?? -1;
+    const bPct = b.steamPct ?? -1;
+    if (aPct !== bPct) return bPct - aPct;
+    return a.name.localeCompare(b.name);
+  });
+
+  return {
+    picks: picks.map((p) => ({
+      gameId: p.gameId,
+      score: p.score,
+      breakdown: p.breakdown,
+      flags: p.flags,
+    })),
+    weightsUsed: input.weights,
+    coldStart,
+  };
+}
