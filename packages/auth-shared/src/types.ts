@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 // User identity
 export interface User {
   id: string;
@@ -7,6 +9,7 @@ export interface User {
   avatarUrl: string | null;
   createdAt: string;
   updatedAt: string;
+  steamLibrarySyncedAt?: string | null;
 }
 
 export interface Session {
@@ -138,3 +141,94 @@ export interface DimVoteRequest {
   dim: 'combat' | 'grind' | 'buildingDepth' | 'commitmentLevel' | 'pvpFocus' | 'sessionLength';
   value: 1 | 2 | 3 | 4 | 5;
 }
+
+// === v2.1 additions ===
+
+/** Game thumbs vote per (group, user, game). */
+export interface Thumb {
+  groupId: string;
+  userId: string;
+  gameId: string;
+  vote: -1 | 1;
+  votedAt: string;
+}
+
+/** Reasons a recommendation card might display caveats. */
+export type GameFlag = 'cold-start' | 'low-confidence' | 'not-enriched' | 'never-played';
+
+/** Game extended with v2.1 catalog metadata. Steam review fields NULL until enriched. */
+export interface GameV21 extends Game {
+  steamReviewScore: number | null;
+  steamReviewScoreDesc: string | null;
+  steamReviewPctPositive: number | null;
+  steamReviewCount: number | null;
+}
+
+/** Game enriched with group-relative context (for recommender + UI). */
+export interface EnrichedGame extends GameV21 {
+  ownerCount: number;
+  groupSize: number;
+  thumbs: { up: number; down: number };
+  yourVote: -1 | 0 | 1;
+  flags: GameFlag[];
+}
+
+/** Recommender output (one entry per pick). */
+export interface RankedPick {
+  game: GameV21;
+  score: number;
+  breakdown: { thumbs: number; ownership: number; novelty: number };
+  flags: GameFlag[];
+  ownerCount: number;
+  groupSize: number;
+  thumbs: { up: number; down: number };
+  yourVote: -1 | 0 | 1;
+}
+
+export interface RecommendationsResponse {
+  picks: RankedPick[];
+  generatedAt: string;
+  weightsUsed: { thumbs: number; ownership: number; novelty: number };
+  coldStart: boolean;
+}
+
+export interface LibraryEntry {
+  game: GameV21;
+  ownerCount: number;
+  yourVote: -1 | 0 | 1;
+  thumbs: { up: number; down: number };
+  yourPlaytime: number | null;
+  yourLastPlayed: string | null;
+}
+
+export interface LibraryResponse {
+  games: LibraryEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface SyncResult {
+  gamesAdded: number;
+  gamesUpdated: number;
+  ownershipRemoved: number;
+  enrichmentDeferred: number;
+  syncedAt: string;
+}
+
+export interface FeatureFlags {
+  autosyncOnLogin: boolean;
+  thumbs: boolean;
+  recommendations: boolean;
+  steamRatings: boolean;
+}
+
+export interface ConfigResponse {
+  flags: FeatureFlags;
+}
+
+/** Request body for PUT /api/groups/:gid/games/:gameId/thumb */
+export const ThumbVoteRequestV21Schema = z.object({
+  vote: z.union([z.literal(-1), z.literal(1)]),
+});
+export type ThumbVoteRequestV21 = z.infer<typeof ThumbVoteRequestV21Schema>;
