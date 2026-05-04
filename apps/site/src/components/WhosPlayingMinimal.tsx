@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, AuthError } from '../lib/api-client.js';
 import { fetchMe, signOut, type MeResponse } from '../lib/auth.js';
+import { SettingsIcon, SignOutIcon } from './icons.js';
 
 const WORKER_URL = (import.meta.env.PUBLIC_WORKER_URL as string) ?? 'http://localhost:8787';
 
@@ -127,15 +128,22 @@ export default function WhosPlayingMinimal() {
           ) : null}
           <h1 className="text-2xl font-semibold">{greeting}</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <a href="/me" className="text-sm text-muted hover:text-text">
-            Settings
+        <div className="flex items-center gap-1">
+          <a
+            href="/me"
+            aria-label="Settings"
+            title="Settings"
+            className="rounded p-2 text-muted transition hover:bg-panel hover:text-text"
+          >
+            <SettingsIcon />
           </a>
           <button
             onClick={() => void signOut()}
-            className="text-sm text-muted underline hover:text-text"
+            aria-label="Sign out"
+            title="Sign out"
+            className="rounded p-2 text-muted transition hover:bg-panel hover:text-text"
           >
-            Sign out
+            <SignOutIcon />
           </button>
         </div>
       </header>

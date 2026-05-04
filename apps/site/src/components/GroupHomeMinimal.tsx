@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, AuthError } from '../lib/api-client.js';
 import type { Group, GroupInvite, GroupMember } from '@wwp/auth-shared';
+import { ArrowLeftIcon } from './icons.js';
 
 interface Props {
   gid: string;
@@ -72,8 +73,11 @@ export default function GroupHomeMinimal({ gid }: Props) {
   if (error) {
     return (
       <div className="space-y-3">
-        <a href="/who" className="text-sm text-muted hover:text-text">
-          ← Back
+        <a
+          href="/who"
+          className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-text"
+        >
+          <ArrowLeftIcon /> Back
         </a>
         <div className="rounded border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
           {error}
@@ -91,8 +95,11 @@ export default function GroupHomeMinimal({ gid }: Props) {
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <a href="/who" className="text-sm text-muted hover:text-text">
-          ← All groups
+        <a
+          href="/who"
+          className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-text"
+        >
+          <ArrowLeftIcon /> All groups
         </a>
         <h1 className="text-2xl font-semibold">{group.displayName}</h1>
         <p className="text-xs text-muted">
