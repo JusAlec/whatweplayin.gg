@@ -15,6 +15,7 @@ import {
   verifySteamOpenIDResponse,
   fetchSteamProfile,
 } from '../auth/steam-openid.js';
+import { sendMagicLinkEmail } from '../lib/resend.js';
 import type { Env } from '../index.js';
 
 const MagicRequestSchema = z.object({ email: z.string().email() });
@@ -37,8 +38,17 @@ export async function dispatchAuth(ctx: AuthCtx): Promise<Response | null> {
     const parsed = MagicRequestSchema.safeParse(body);
     if (!parsed.success) return badRequest('invalid email');
     const token = await generateMagicLinkToken(env.DB, parsed.data.email);
-    // Email sending wired in Batch 5 (Resend integration); for now return token in dev for testing
-    return json({ ok: true, token: __DEV__() ? token : undefined });
+    const magicUrl = `${baseUrl}/api/auth/callback/magic?token=${token}`;
+    if (env.RESEND_API_KEY) {
+      try {
+        await sendMagicLinkEmail(env.RESEND_API_KEY, parsed.data.email, magicUrl);
+      } catch (err) {
+        console.error('Resend send failed:', err);
+        return json({ ok: false, error: 'email-send-failed' }, 502);
+      }
+    }
+    // Always return ok to avoid leaking email-existence; in dev (no API key) return token for testing
+    return json({ ok: true, devToken: env.RESEND_API_KEY ? undefined : token });
   }
 
   // GET /api/auth/callback/magic?token=...
@@ -172,9 +182,4 @@ function json(body: unknown, status = 200): Response {
 
 function badRequest(msg: string): Response {
   return json({ error: msg }, 400);
-}
-
-function __DEV__(): boolean {
-  // wrangler dev sets this; true in tests
-  return true;
 }

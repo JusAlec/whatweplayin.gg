@@ -83,3 +83,18 @@ describe('GET /api/auth/login/steam', () => {
     expect(res.headers.get('location')).toContain('https://steamcommunity.com/openid/login');
   });
 });
+
+describe('POST /api/auth/magic/request with Resend', () => {
+  test('returns devToken when RESEND_API_KEY is unset', async () => {
+    // env in tests has no RESEND_API_KEY by default
+    const res = await SELF.fetch('https://x/api/auth/magic/request', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'dev@test.co' }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ok: boolean; devToken?: string };
+    expect(body.ok).toBe(true);
+    expect(body.devToken).toMatch(/^[a-f0-9]{64}$/);
+  });
+});
