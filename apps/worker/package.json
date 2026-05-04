@@ -16,7 +16,8 @@
     "@wwp/auth-shared": "workspace:*",
     "@wwp/recommender": "workspace:*",
     "better-auth": "^1.6.9",
-    "ulid": "^3.0.2"
+    "ulid": "^3.0.2",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.1.0",
