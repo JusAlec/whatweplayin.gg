@@ -1,0 +1,93 @@
+name: cloudflare-bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      push-secrets:
+        description: "Push BETTER_AUTH_SECRET + RESEND_API_KEY + STEAM_API_KEY to Worker (run AFTER setting GitHub secrets)"
+        type: boolean
+        default: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.4
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Check or create D1 namespace
+        id: d1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          # Get list of existing namespaces as JSON
+          EXISTING=$(pnpm --filter @wwp/worker exec wrangler d1 list --json 2>/dev/null || echo "[]")
+          ID=$(echo "$EXISTING" | jq -r '.[] | select(.name == "whatweplayin-prod") | .uuid' || true)
+
+          if [ -n "$ID" ] && [ "$ID" != "null" ]; then
+            echo "D1 namespace 'whatweplayin-prod' already exists with id: $ID"
+          else
+            echo "Creating D1 namespace 'whatweplayin-prod'..."
+            CREATE_OUT=$(pnpm --filter @wwp/worker exec wrangler d1 create whatweplayin-prod 2>&1)
+            echo "$CREATE_OUT"
+            ID=$(echo "$CREATE_OUT" | grep -oE 'database_id = "[^"]+"' | cut -d'"' -f2 | head -1)
+            if [ -z "$ID" ]; then
+              echo "Failed to extract database_id from create output" >&2
+              exit 1
+            fi
+          fi
+
+          echo "database_id=$ID" >> "$GITHUB_OUTPUT"
+          echo "## D1 namespace ready" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```toml' >> "$GITHUB_STEP_SUMMARY"
+          echo "database_id = \"$ID\"" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Paste this into \`apps/worker/wrangler.toml\` replacing PLACEHOLDER_REPLACE_AFTER_CREATE." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply pending migrations
+        if: hashFiles('apps/worker/migrations/*.sql') != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # Wrangler reads database_id from wrangler.toml — if it's still PLACEHOLDER, this will fail with a clear error.
+          # That's expected on the first run (before user updates wrangler.toml with the captured ID).
+          pnpm --filter @wwp/worker exec wrangler d1 migrations apply whatweplayin-prod --remote --yes || {
+            echo "::warning::Migration apply failed — likely because wrangler.toml still has PLACEHOLDER_REPLACE_AFTER_CREATE. Update wrangler.toml with the captured database_id (see step output above), commit, push, then re-run this workflow."
+            exit 0
+          }
+
+      - name: Push secrets to Worker (optional)
+        if: ${{ inputs.push-secrets }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+        run: |
+          set -euo pipefail
+          for SECRET_NAME in BETTER_AUTH_SECRET RESEND_API_KEY STEAM_API_KEY; do
+            VALUE="${!SECRET_NAME:-}"
+            if [ -z "$VALUE" ]; then
+              echo "::warning::GitHub secret $SECRET_NAME is unset; skipping"
+              continue
+            fi
+            echo "Pushing $SECRET_NAME to Worker..."
+            echo -n "$VALUE" | pnpm --filter @wwp/worker exec wrangler secret put "$SECRET_NAME"
+          done
