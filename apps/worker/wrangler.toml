@@ -16,6 +16,20 @@ BETTER_AUTH_URL = "https://whatweplayin.gg"
 SITE_ORIGIN = "https://whatweplayin.gg"
 SESSION_COOKIE_DOMAIN = "whatweplayin.gg"
 
+# v2.1 feature flags
+WWP_FEAT_AUTOSYNC_ON_LOGIN = "true"
+WWP_FEAT_THUMBS = "true"
+WWP_FEAT_RECOMMENDATIONS = "true"
+WWP_FEAT_STEAM_RATINGS = "true"
+
+# v2.1 tunables
+WWP_AUTOSYNC_STALENESS_HOURS = "6"
+WWP_WEIGHT_THUMBS = "0.5"
+WWP_WEIGHT_OWNERSHIP = "0.3"
+WWP_WEIGHT_NOVELTY = "0.2"
+WWP_RECOMMENDATIONS_LIMIT = "5"
+WWP_THUMBS_DOWN_VETO_DAYS = "7"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "whatweplayin-prod"

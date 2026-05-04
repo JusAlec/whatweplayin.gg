@@ -8,3 +8,15 @@ export * from './novelty.js';
 export * from './score.js';
 export * from './rank.js';
 export * from './recommend.js';
+export {
+  rankByThumbs,
+  computeThumbsScore,
+  computeOwnershipScore,
+  computeNoveltyScore,
+} from './v2-thumbs.js';
+export type {
+  RankInput,
+  RankResult,
+  EnrichedGameForRanking,
+  GameFlag as GameFlagV21,
+} from './v2-thumbs.js';

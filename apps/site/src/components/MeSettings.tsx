@@ -9,10 +9,20 @@ const PROVIDER_LABELS: Record<string, string> = {
   steam: 'Steam',
 };
 
+interface SyncResultBody {
+  ok: boolean;
+  gamesAdded: number;
+  gamesUpdated: number;
+  ownershipRemoved: number;
+  syncedAt: string;
+}
+
 export default function MeSettings() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
   async function load() {
     setError(null);
@@ -35,6 +45,31 @@ export default function MeSettings() {
   useEffect(() => {
     load();
   }, []);
+
+  async function refreshSteam() {
+    setSyncBusy(true);
+    setSyncMsg(null);
+    try {
+      const r = await api.post<SyncResultBody>('/api/me/sync/steam', {});
+      setSyncMsg({
+        kind: 'success',
+        text: `Synced. +${r.gamesAdded} new, ${r.gamesUpdated} updated, -${r.ownershipRemoved} removed.`,
+      });
+      await load();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('steam-private') || msg.includes('422')) {
+        setSyncMsg({
+          kind: 'error',
+          text: 'Steam profile is private. Open Privacy Settings → set Game Details to Public, then try again.',
+        });
+      } else {
+        setSyncMsg({ kind: 'error', text: `Sync failed: ${msg}` });
+      }
+    } finally {
+      setSyncBusy(false);
+    }
+  }
 
   async function unlink(provider: string) {
     if (!confirm(`Unlink ${PROVIDER_LABELS[provider] ?? provider}?`)) return;
@@ -110,44 +145,97 @@ export default function MeSettings() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Linked accounts</h2>
         <div className="divide-y divide-border rounded border border-border bg-panel">
-          <div className="flex items-center justify-between gap-3 p-3">
-            <div>
-              <div className="text-sm font-medium">Steam</div>
+          <div className="space-y-2 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">Steam</div>
+                {linkedSteam ? (
+                  <div className="text-xs text-muted">
+                    ID {linkedSteam.providerUserId}
+                    {linkedSteam.providerData?.personaname
+                      ? ` · ${linkedSteam.providerData.personaname}`
+                      : ''}
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted">Not linked</div>
+                )}
+              </div>
               {linkedSteam ? (
-                <div className="text-xs text-muted">
-                  ID {linkedSteam.providerUserId}
-                  {linkedSteam.providerData?.personaname
-                    ? ` · ${linkedSteam.providerData.personaname}`
-                    : ''}
-                </div>
+                <button
+                  onClick={() => void unlink('steam')}
+                  disabled={busyProvider === 'steam' || !canUnlink('steam')}
+                  title={
+                    !canUnlink('steam')
+                      ? 'Set an email on your account before unlinking — otherwise you cannot sign back in.'
+                      : undefined
+                  }
+                  className="shrink-0 rounded border border-danger/40 px-3 py-1.5 text-sm text-danger hover:bg-danger/10 disabled:opacity-50"
+                >
+                  {busyProvider === 'steam' ? 'Unlinking…' : 'Unlink'}
+                </button>
               ) : (
-                <div className="text-xs text-muted">Not linked</div>
+                <a
+                  href={`${WORKER_URL}/api/auth/link/steam`}
+                  className="shrink-0 rounded bg-accent px-3 py-1.5 text-sm font-semibold text-white"
+                >
+                  Link Steam
+                </a>
               )}
             </div>
-            {linkedSteam ? (
-              <button
-                onClick={() => void unlink('steam')}
-                disabled={busyProvider === 'steam' || !canUnlink('steam')}
-                title={
-                  !canUnlink('steam')
-                    ? 'Set an email on your account before unlinking — otherwise you cannot sign back in.'
-                    : undefined
-                }
-                className="shrink-0 rounded border border-danger/40 px-3 py-1.5 text-sm text-danger hover:bg-danger/10 disabled:opacity-50"
+            {linkedSteam && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted">
+                  {me.user.steamLibrarySyncedAt
+                    ? `Last synced: ${formatRelative(me.user.steamLibrarySyncedAt)}`
+                    : 'Never synced'}
+                </span>
+                <button
+                  onClick={() => void refreshSteam()}
+                  disabled={syncBusy}
+                  className="rounded border border-border px-3 py-1 text-xs text-muted hover:border-accent hover:text-accent disabled:opacity-50"
+                >
+                  {syncBusy ? 'Syncing…' : 'Refresh library'}
+                </button>
+              </div>
+            )}
+            {syncMsg && (
+              <div
+                className={`rounded border p-2 text-xs ${
+                  syncMsg.kind === 'success'
+                    ? 'border-success/40 bg-success/10 text-success'
+                    : 'border-danger/40 bg-danger/10 text-danger'
+                }`}
               >
-                {busyProvider === 'steam' ? 'Unlinking…' : 'Unlink'}
-              </button>
-            ) : (
-              <a
-                href={`${WORKER_URL}/api/auth/link/steam`}
-                className="shrink-0 rounded bg-accent px-3 py-1.5 text-sm font-semibold text-white"
-              >
-                Link Steam
-              </a>
+                {syncMsg.text}
+                {syncMsg.kind === 'error' && syncMsg.text.includes('Privacy Settings') && (
+                  <>
+                    {' '}
+                    <a
+                      href="https://steamcommunity.com/my/edit/settings"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                    >
+                      Open Steam settings
+                    </a>
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>
       </section>
     </div>
   );
+}
+
+function formatRelative(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
 }

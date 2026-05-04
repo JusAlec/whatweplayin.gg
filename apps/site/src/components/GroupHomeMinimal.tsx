@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api, AuthError } from '../lib/api-client.js';
 import type { Group, GroupInvite, GroupMember } from '@wwp/auth-shared';
-import { ArrowLeftIcon } from './icons.js';
+import { ArrowLeftIcon, RefreshIcon } from './icons.js';
+import GameCard from './GameCard.js';
+import { useConfig } from '../lib/useConfig.js';
 
 interface Props {
   gid: string;
@@ -12,12 +14,63 @@ interface MemberWithUser extends GroupMember {
   avatarUrl: string | null;
 }
 
+interface GameSummary {
+  id: string;
+  name: string;
+  coverUrl: string | null;
+  steamReviewScoreDesc: string | null;
+  steamReviewPctPositive: number | null;
+  steamReviewCount: number | null;
+  metadataSyncedAt: string | null;
+  hasCoop: boolean;
+  hasPvp: boolean;
+  hasSingleplayer: boolean;
+}
+
+interface RecommendationPick {
+  game: GameSummary;
+  ownerCount: number;
+  groupSize: number;
+  thumbs: { up: number; down: number };
+  yourVote: -1 | 0 | 1;
+  flags: string[];
+}
+
+interface RecommendationsResp {
+  picks: RecommendationPick[];
+  coldStart: boolean;
+}
+
+interface LibraryEntry {
+  game: GameSummary;
+  ownerCount: number;
+  yourVote: -1 | 0 | 1;
+  thumbs: { up: number; down: number };
+}
+
+interface LibraryResp {
+  games: LibraryEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+const LIBRARY_PAGE_SIZE = 24;
+type LibraryFilter = 'all' | 'coop' | 'pvp' | 'single';
+
 export default function GroupHomeMinimal({ gid }: Props) {
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<MemberWithUser[]>([]);
   const [invites, setInvites] = useState<GroupInvite[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [recs, setRecs] = useState<RecommendationsResp | null>(null);
+  const [recsBusy, setRecsBusy] = useState(false);
+  const [library, setLibrary] = useState<LibraryResp | null>(null);
+  const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>('all');
+  const [librarySearchInput, setLibrarySearchInput] = useState('');
+  const [librarySearchActive, setLibrarySearchActive] = useState('');
+  const { flags: featureFlags } = useConfig();
 
   async function load() {
     setError(null);
@@ -43,6 +96,46 @@ export default function GroupHomeMinimal({ gid }: Props) {
   useEffect(() => {
     load();
   }, [gid]);
+
+  async function loadRecs() {
+    setRecsBusy(true);
+    try {
+      const r = await api.get<RecommendationsResp>(`/api/groups/${gid}/recommendations`);
+      setRecs(r);
+    } catch (err) {
+      console.error('recommendations fetch failed:', err);
+    } finally {
+      setRecsBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (featureFlags.recommendations && group) {
+      void loadRecs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [featureFlags.recommendations, group]);
+
+  async function loadLibrary(opts: { offset?: number; filter?: LibraryFilter; q?: string } = {}) {
+    const params = new URLSearchParams({
+      limit: String(LIBRARY_PAGE_SIZE),
+      offset: String(opts.offset ?? 0),
+      filter: opts.filter ?? libraryFilter,
+    });
+    const q = opts.q ?? librarySearchActive;
+    if (q) params.set('q', q);
+    try {
+      const r = await api.get<LibraryResp>(`/api/groups/${gid}/library?${params}`);
+      setLibrary(r);
+    } catch (err) {
+      console.error('library fetch failed:', err);
+    }
+  }
+
+  useEffect(() => {
+    if (group) void loadLibrary({ offset: 0, filter: libraryFilter, q: librarySearchActive });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group, libraryFilter, librarySearchActive]);
 
   async function createInvite() {
     setBusy(true);
@@ -126,6 +219,117 @@ export default function GroupHomeMinimal({ gid }: Props) {
             </li>
           ))}
         </ul>
+      </section>
+
+      {featureFlags.recommendations && (
+        <section className="space-y-2">
+          <header className="flex items-center gap-2">
+            <h2 className="text-lg font-medium">Recommended tonight</h2>
+            {recs?.coldStart && (
+              <span className="text-xs font-normal text-muted">
+                (using Steam ratings — vote thumbs to personalize)
+              </span>
+            )}
+            <button
+              onClick={() => void loadRecs()}
+              disabled={recsBusy}
+              aria-label="Refresh recommendations"
+              title="Refresh recommendations"
+              className="ml-auto rounded p-1 text-muted hover:bg-panel hover:text-text disabled:opacity-50"
+            >
+              <RefreshIcon />
+            </button>
+          </header>
+          {recs === null ? (
+            <p className="text-sm text-muted">Loading…</p>
+          ) : recs.picks.length === 0 ? (
+            <p className="text-sm text-muted">
+              No multiplayer games in your shared library yet. Have someone link Steam, or wait for
+              thumb-down vetoes to lift.
+            </p>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {recs.picks.map((p) => (
+                <GameCard
+                  key={p.game.id}
+                  game={p.game}
+                  groupId={gid}
+                  ownerCount={p.ownerCount}
+                  groupSize={p.groupSize}
+                  thumbs={p.thumbs}
+                  yourVote={p.yourVote}
+                  flags={p.flags}
+                  showThumbs={featureFlags.thumbs}
+                  showRating={featureFlags.steamRatings}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      <section>
+        <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-medium">Browse library</h2>
+          <div className="flex flex-wrap gap-2">
+            {(['all', 'coop', 'pvp', 'single'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setLibraryFilter(f)}
+                className={`rounded border px-3 py-1 text-xs transition ${
+                  libraryFilter === f
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-border text-muted hover:border-accent hover:text-accent'
+                }`}
+              >
+                {f === 'all' ? 'All' : f === 'coop' ? 'Co-op' : f === 'pvp' ? 'PvP' : 'Single'}
+              </button>
+            ))}
+            <input
+              value={librarySearchInput}
+              onChange={(e) => setLibrarySearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setLibrarySearchActive(librarySearchInput);
+              }}
+              placeholder="Search…"
+              className="rounded border border-border bg-panel px-2 py-1 text-xs"
+            />
+          </div>
+        </header>
+        {library === null ? (
+          <p className="text-muted text-sm">Loading library…</p>
+        ) : library.games.length === 0 ? (
+          <p className="text-muted text-sm">No games match.</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {library.games.map((entry) => (
+                <GameCard
+                  key={entry.game.id}
+                  game={entry.game}
+                  groupId={gid}
+                  ownerCount={entry.ownerCount}
+                  groupSize={members.length}
+                  thumbs={entry.thumbs}
+                  yourVote={entry.yourVote}
+                  showThumbs={featureFlags.thumbs}
+                  showRating={featureFlags.steamRatings}
+                />
+              ))}
+            </div>
+            {library.offset + library.games.length < library.total && (
+              <button
+                onClick={() => {
+                  const newOffset = library.offset + library.limit;
+                  void loadLibrary({ offset: newOffset });
+                }}
+                className="mt-4 w-full rounded border border-border py-2 text-sm text-muted hover:border-accent hover:text-accent"
+              >
+                Load more ({library.total - library.offset - library.games.length} remaining)
+              </button>
+            )}
+          </>
+        )}
       </section>
 
       <section className="space-y-3">

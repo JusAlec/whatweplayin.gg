@@ -74,6 +74,11 @@ export default function WhosPlayingMinimal() {
         kind: 'error',
         text: 'That Steam account is already linked to a different user.',
       });
+    } else if (params.get('linkError') === 'steam-private') {
+      setLinkBanner({
+        kind: 'error',
+        text: 'Steam linked, but your library is private. Open Steam → Privacy Settings → set Game Details to Public, then click Refresh on /me.',
+      });
     }
     if (params.has('linked') || params.has('linkError')) {
       // Strip the query params from the URL without reloading.

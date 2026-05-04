@@ -131,3 +131,18 @@ describe('DELETE /api/me/links/:provider', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('POST /api/me/sync/steam', () => {
+  test('400 when user has no Steam OAuth linked', async () => {
+    const res = await SELF.fetch('https://x/api/me/sync/steam', {
+      method: 'POST',
+      headers: { cookie: `wwp_session=${sessionId}` },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('401 when unauthenticated', async () => {
+    const res = await SELF.fetch('https://x/api/me/sync/steam', { method: 'POST' });
+    expect(res.status).toBe(401);
+  });
+});

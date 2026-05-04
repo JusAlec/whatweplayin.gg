@@ -18,6 +18,7 @@ function rowToUser(row: Record<string, unknown>): User {
     avatarUrl: (row.avatar_url as string | null) ?? null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+    steamLibrarySyncedAt: (row.steam_library_synced_at as string | null) ?? null,
   };
 }
 
@@ -95,6 +96,66 @@ class UsersTable {
   async getByEmail(email: string): Promise<User | null> {
     const row = await this.db.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
     return row ? rowToUser(row as Record<string, unknown>) : null;
+  }
+
+  async setSteamLibrarySyncedAt(userId: string, syncedAt: string): Promise<void> {
+    await this.db
+      .prepare('UPDATE users SET steam_library_synced_at = ?, updated_at = ? WHERE id = ?')
+      .bind(syncedAt, new Date().toISOString(), userId)
+      .run();
+  }
+}
+
+class ThumbsTable {
+  constructor(private db: D1Database) {}
+
+  async upsert(
+    groupId: string,
+    userId: string,
+    gameId: string,
+    vote: -1 | 1,
+  ): Promise<{ vote: -1 | 1; votedAt: string }> {
+    const votedAt = new Date().toISOString();
+    await this.db
+      .prepare(
+        `INSERT INTO thumbs (group_id, user_id, game_id, vote, voted_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (group_id, user_id, game_id) DO UPDATE
+            SET vote = excluded.vote, voted_at = excluded.voted_at`,
+      )
+      .bind(groupId, userId, gameId, vote, votedAt)
+      .run();
+    return { vote, votedAt };
+  }
+
+  async delete(groupId: string, userId: string, gameId: string): Promise<void> {
+    await this.db
+      .prepare('DELETE FROM thumbs WHERE group_id = ? AND user_id = ? AND game_id = ?')
+      .bind(groupId, userId, gameId)
+      .run();
+  }
+
+  async listByGroup(
+    groupId: string,
+  ): Promise<Array<{ userId: string; gameId: string; vote: -1 | 1; votedAt: string }>> {
+    const result = await this.db
+      .prepare('SELECT user_id, game_id, vote, voted_at FROM thumbs WHERE group_id = ?')
+      .bind(groupId)
+      .all();
+    return (result.results as Record<string, unknown>[]).map((r) => ({
+      userId: r.user_id as string,
+      gameId: r.game_id as string,
+      vote: r.vote as -1 | 1,
+      votedAt: r.voted_at as string,
+    }));
+  }
+
+  async countForGroup(groupId: string): Promise<number> {
+    const row = await this.db
+      .prepare('SELECT COUNT(*) AS n FROM thumbs WHERE group_id = ?')
+      .bind(groupId)
+      .first();
+    return (row as { n: number }).n;
   }
 }
 
@@ -206,6 +267,7 @@ export class Db {
   sessions: SessionsTable;
   groupMembers: GroupMembersTable;
   groupInvites: GroupInvitesTable;
+  thumbs: ThumbsTable;
 
   constructor(d1: D1Database) {
     this.users = new UsersTable(d1);
@@ -213,5 +275,6 @@ export class Db {
     this.sessions = new SessionsTable(d1);
     this.groupMembers = new GroupMembersTable(d1);
     this.groupInvites = new GroupInvitesTable(d1);
+    this.thumbs = new ThumbsTable(d1);
   }
 }
