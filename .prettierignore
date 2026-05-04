@@ -9,3 +9,6 @@ pnpm-lock.yaml
 # Prettier's JSON formatting differs and would force a no-op rewrite cycle.
 data/groups/*/people.json
 data/groups/*/group.json
+
+# Prettier has no SQL parser
+*.sql
