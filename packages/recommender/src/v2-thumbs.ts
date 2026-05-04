@@ -51,3 +51,28 @@ export function computeThumbsScore(input: ThumbsScoreInput): number {
   }
   return base;
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export interface OwnershipScoreInput {
+  ownerCount: number;
+  groupSize: number;
+}
+
+export function computeOwnershipScore(input: OwnershipScoreInput): number {
+  if (input.groupSize <= 0) return 0;
+  return Math.max(0, Math.min(1, input.ownerCount / input.groupSize));
+}
+
+export interface NoveltyScoreInput {
+  maxLastPlayed: string | null;
+  now: Date;
+}
+
+export function computeNoveltyScore(input: NoveltyScoreInput): number {
+  if (input.maxLastPlayed === null) return 1.0;
+  const last = new Date(input.maxLastPlayed).getTime();
+  const daysSince = (input.now.getTime() - last) / DAY_MS;
+  if (daysSince <= 0) return 0;
+  return Math.min(1, daysSince / NOVELTY_DECAY_DAYS);
+}

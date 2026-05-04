@@ -1,5 +1,9 @@
 import { describe, test, expect } from 'vitest';
-import { computeThumbsScore } from '../src/v2-thumbs.js';
+import {
+  computeThumbsScore,
+  computeOwnershipScore,
+  computeNoveltyScore,
+} from '../src/v2-thumbs.js';
 
 describe('computeThumbsScore', () => {
   test('returns 0.5 (neutral) for game with no thumbs', () => {
@@ -73,5 +77,67 @@ describe('computeThumbsScore', () => {
       steamPctPositive: 95,
     });
     expect(score).toBeCloseTo(0.5, 5);
+  });
+});
+
+describe('computeOwnershipScore', () => {
+  test('returns 1.0 when everyone owns', () => {
+    expect(computeOwnershipScore({ ownerCount: 5, groupSize: 5 })).toBe(1.0);
+  });
+
+  test('returns 0.5 for half-owned', () => {
+    expect(computeOwnershipScore({ ownerCount: 4, groupSize: 8 })).toBe(0.5);
+  });
+
+  test('returns 0.0 for ownerCount 0', () => {
+    expect(computeOwnershipScore({ ownerCount: 0, groupSize: 8 })).toBe(0.0);
+  });
+
+  test('returns 0.0 when groupSize is 0 (avoid div-by-zero)', () => {
+    expect(computeOwnershipScore({ ownerCount: 0, groupSize: 0 })).toBe(0.0);
+  });
+});
+
+describe('computeNoveltyScore', () => {
+  const NOW = new Date('2026-05-04T00:00:00Z');
+
+  test('returns 1.0 when nobody has played (maxLastPlayed null)', () => {
+    expect(computeNoveltyScore({ maxLastPlayed: null, now: NOW })).toBe(1.0);
+  });
+
+  test('returns 1.0 when last played 30+ days ago', () => {
+    expect(
+      computeNoveltyScore({
+        maxLastPlayed: '2026-04-01T00:00:00Z', // 33 days ago
+        now: NOW,
+      }),
+    ).toBe(1.0);
+  });
+
+  test('returns 0.0 when played today', () => {
+    expect(
+      computeNoveltyScore({
+        maxLastPlayed: '2026-05-04T00:00:00Z',
+        now: NOW,
+      }),
+    ).toBeCloseTo(0.0, 3);
+  });
+
+  test('returns 0.5 at 15 days', () => {
+    expect(
+      computeNoveltyScore({
+        maxLastPlayed: '2026-04-19T00:00:00Z', // 15 days ago
+        now: NOW,
+      }),
+    ).toBeCloseTo(0.5, 3);
+  });
+
+  test('caps at 1.0 (no boost beyond 30 days)', () => {
+    expect(
+      computeNoveltyScore({
+        maxLastPlayed: '2026-01-01T00:00:00Z', // 123 days ago
+        now: NOW,
+      }),
+    ).toBe(1.0);
   });
 });
