@@ -70,3 +70,64 @@ describe('GET /api/me', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('DELETE /api/me/links/:provider', () => {
+  test('unlinks Steam when user still has email auth available', async () => {
+    await env.DB.prepare(
+      'INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, provider_data, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+      .bind('oa1', 'u1', 'steam', '7656', null, new Date().toISOString())
+      .run();
+
+    const res = await SELF.fetch('https://x/api/me/links/steam', {
+      method: 'DELETE',
+      headers: { cookie: `wwp_session=${sessionId}` },
+    });
+    expect(res.status).toBe(200);
+    const remaining = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM oauth_accounts WHERE user_id = ?',
+    )
+      .bind('u1')
+      .first();
+    expect((remaining as { n: number }).n).toBe(0);
+  });
+
+  test('refuses to unlink when it would leave user with no auth', async () => {
+    // Steam-only user (no email)
+    const now = new Date().toISOString();
+    await db().users.insert({
+      id: 'u_steam_only',
+      email: null,
+      emailVerified: false,
+      displayName: 'SteamOnly',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await env.DB.prepare(
+      'INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, provider_data, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+      .bind('oa_only', 'u_steam_only', 'steam', '76562', null, now)
+      .run();
+    const steamOnlySession = await createSessionForUser(env.DB, 'u_steam_only');
+
+    const res = await SELF.fetch('https://x/api/me/links/steam', {
+      method: 'DELETE',
+      headers: { cookie: `wwp_session=${steamOnlySession}` },
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe('cannot-unlink-last-auth');
+
+    // Verify the row was NOT deleted
+    const row = await env.DB.prepare('SELECT id FROM oauth_accounts WHERE user_id = ?')
+      .bind('u_steam_only')
+      .first();
+    expect(row).not.toBeNull();
+  });
+
+  test('401 unauthenticated', async () => {
+    const res = await SELF.fetch('https://x/api/me/links/steam', { method: 'DELETE' });
+    expect(res.status).toBe(401);
+  });
+});

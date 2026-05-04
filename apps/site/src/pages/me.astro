@@ -1,0 +1,9 @@
+---
+import Layout from '../layouts/Layout.astro';
+import MeSettings from '../components/MeSettings.tsx';
+export const prerender = false;
+---
+
+<Layout title="Settings — WhatWePlayin">
+  <MeSettings client:only="react" />
+</Layout>
