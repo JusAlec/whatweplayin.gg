@@ -58,12 +58,15 @@ describe('getOwnedGames', () => {
   });
 
   test('builds correct URL with key, steamid, include_played_free_games', async () => {
-    const fakeFetch = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ response: { game_count: 0, games: [] } }), { status: 200 }),
-    );
-    await getOwnedGames('mykey', '76561198000000001', fakeFetch as typeof fetch);
-    const calledUrl = fakeFetch.mock.calls[0]![0] as string;
+    const calls: string[] = [];
+    const fakeFetch: typeof fetch = async (input) => {
+      calls.push(typeof input === 'string' ? input : (input as Request).url);
+      return new Response(JSON.stringify({ response: { game_count: 0, games: [] } }), {
+        status: 200,
+      });
+    };
+    await getOwnedGames('mykey', '76561198000000001', fakeFetch);
+    const calledUrl = calls[0] ?? '';
     expect(calledUrl).toContain('key=mykey');
     expect(calledUrl).toContain('steamid=76561198000000001');
     expect(calledUrl).toContain('include_played_free_games=1');
