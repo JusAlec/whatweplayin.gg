@@ -35,7 +35,11 @@ export async function dispatchAuth(ctx: AuthCtx): Promise<Response | null> {
     const parsed = MagicRequestSchema.safeParse(body);
     if (!parsed.success) return badRequest('invalid email');
     const token = await generateMagicLinkToken(env.DB, parsed.data.email);
-    const magicUrl = `${baseUrl}/api/auth/callback/magic?token=${token}`;
+    // Magic link must point at the worker (where the callback handler lives),
+    // not the site (`baseUrl`). The worker is the host receiving this request.
+    const reqUrl = new URL(request.url);
+    const apiOrigin = `${reqUrl.protocol}//${reqUrl.host}`;
+    const magicUrl = `${apiOrigin}/api/auth/callback/magic?token=${token}`;
     if (env.RESEND_API_KEY) {
       try {
         await sendMagicLinkEmail(env.RESEND_API_KEY, parsed.data.email, magicUrl);
