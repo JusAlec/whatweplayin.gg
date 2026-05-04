@@ -126,15 +126,88 @@ async function removeStaleOwnership(
 }
 
 async function enrichNewGames(
-  _env: Env,
-  _candidateGameIds: string[],
-  _opts: SyncOptions,
+  env: Env,
+  candidateGameIds: string[],
+  opts: SyncOptions,
 ): Promise<number> {
-  // Stub for Task 11.
-  // Reference unused imports so they remain available when Task 11 lands.
-  void fetchAppDetails;
-  void fetchAppReviews;
-  void isAppidSkipped;
-  void markAppidSkipped;
-  return 0;
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const parallelism = opts.enrichmentParallelism ?? 6;
+
+  if (candidateGameIds.length === 0) return 0;
+  const placeholders = candidateGameIds.map(() => '?').join(',');
+  const result = await env.DB.prepare(
+    `SELECT id, steam_app_id FROM games
+        WHERE id IN (${placeholders})
+          AND (metadata_synced_at = '' OR metadata_synced_at IS NULL)`,
+  )
+    .bind(...candidateGameIds)
+    .all();
+  const toEnrich = result.results as Array<{ id: string; steam_app_id: number }>;
+  const eligible = toEnrich.filter((row) => !isAppidSkipped(row.steam_app_id));
+
+  for (let i = 0; i < eligible.length; i += parallelism) {
+    const batch = eligible.slice(i, i + parallelism);
+    await Promise.all(batch.map((row) => enrichOne(env, row.id, row.steam_app_id, fetchImpl)));
+  }
+  return eligible.length;
+}
+
+async function enrichOne(
+  env: Env,
+  gameId: string,
+  appid: number,
+  fetchImpl: typeof fetch,
+): Promise<void> {
+  const details = await fetchAppDetails(appid, fetchImpl);
+  if (!details) {
+    // Non-game (DLC, soundtrack) or failed lookup. Cache for 24h.
+    markAppidSkipped(appid);
+    return;
+  }
+
+  let reviews = null;
+  try {
+    reviews = await fetchAppReviews(appid, fetchImpl);
+  } catch {
+    reviews = null;
+  }
+
+  const now = new Date().toISOString();
+  const minPlayers = 1;
+  const maxPlayers = details.hasCoop || details.hasPvp ? 8 : 1;
+
+  await env.DB.prepare(
+    `UPDATE games
+          SET name = ?,
+              cover_url = ?,
+              has_singleplayer = ?,
+              has_coop = ?,
+              has_pvp = ?,
+              min_players = ?,
+              max_players = ?,
+              release_date = ?,
+              metadata_synced_at = ?,
+              steam_review_score = ?,
+              steam_review_score_desc = ?,
+              steam_review_pct_positive = ?,
+              steam_review_count = ?
+        WHERE id = ?`,
+  )
+    .bind(
+      details.name,
+      details.headerImage,
+      details.hasSinglePlayer ? 1 : 0,
+      details.hasCoop ? 1 : 0,
+      details.hasPvp ? 1 : 0,
+      minPlayers,
+      maxPlayers,
+      details.releaseDate,
+      now,
+      reviews?.score ?? null,
+      reviews?.scoreDesc ?? null,
+      reviews?.pctPositive ?? null,
+      reviews?.count ?? null,
+      gameId,
+    )
+    .run();
 }

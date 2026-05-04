@@ -159,3 +159,166 @@ describe('syncSteamLibrary — removed games cleanup', () => {
     expect(ids).not.toContain('steam-2');
   });
 });
+
+describe('syncSteamLibrary — enrichment', () => {
+  test('calls appdetails + appreviews for new games and updates the games row', async () => {
+    const fakeFetch = vi.fn(async (url: string) => {
+      if (url.includes('GetOwnedGames')) {
+        return new Response(
+          JSON.stringify({
+            response: {
+              game_count: 1,
+              games: [{ appid: 730, name: 'CS2', playtime_forever: 100, rtime_last_played: 0 }],
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('appdetails')) {
+        return new Response(
+          JSON.stringify({
+            '730': {
+              success: true,
+              data: {
+                type: 'game',
+                name: 'Counter-Strike 2',
+                header_image: 'https://cdn.example/header.jpg',
+                categories: [
+                  { id: 1, description: 'Multi-player' },
+                  { id: 49, description: 'PvP' },
+                ],
+              },
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('appreviews')) {
+        return new Response(
+          JSON.stringify({
+            success: 1,
+            query_summary: {
+              review_score: 9,
+              review_score_desc: 'Overwhelmingly Positive',
+              total_positive: 950000,
+              total_reviews: 1000000,
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    await syncSteamLibrary(env, 'u1', '76561198000000001', {
+      fetchImpl: fakeFetch as typeof fetch,
+      enrichmentEnabled: true,
+      enrichmentParallelism: 1,
+    });
+
+    const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?')
+      .bind('steam-730')
+      .first();
+    expect(game).not.toBeNull();
+    expect((game as any).name).toBe('Counter-Strike 2');
+    expect((game as any).cover_url).toBe('https://cdn.example/header.jpg');
+    expect((game as any).has_pvp).toBe(1);
+    expect((game as any).has_singleplayer).toBe(0);
+    expect((game as any).steam_review_pct_positive).toBe(95);
+    expect((game as any).steam_review_score_desc).toBe('Overwhelmingly Positive');
+    expect((game as any).metadata_synced_at).toBeTruthy();
+    expect((game as any).metadata_synced_at).not.toBe('');
+  });
+
+  test('skips enrichment for non-game appids and marks them in skip cache', async () => {
+    const fakeFetch = vi.fn(async (url: string) => {
+      if (url.includes('GetOwnedGames')) {
+        return new Response(
+          JSON.stringify({
+            response: {
+              game_count: 1,
+              games: [
+                { appid: 12345, name: 'Some DLC', playtime_forever: 0, rtime_last_played: 0 },
+              ],
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('appdetails')) {
+        return new Response(
+          JSON.stringify({
+            '12345': {
+              success: true,
+              data: { type: 'dlc', name: 'Some DLC', header_image: '', categories: [] },
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    await syncSteamLibrary(env, 'u1', '76561198000000001', {
+      fetchImpl: fakeFetch as typeof fetch,
+      enrichmentEnabled: true,
+    });
+
+    const appreviewsCalls = fakeFetch.mock.calls.filter((c) =>
+      (c[0] as string).includes('appreviews'),
+    );
+    expect(appreviewsCalls.length).toBe(0);
+
+    const game = await env.DB.prepare('SELECT metadata_synced_at FROM games WHERE id = ?')
+      .bind('steam-12345')
+      .first();
+    expect((game as any).metadata_synced_at).toBe('');
+  });
+
+  test('handles appreviews failure by leaving review fields NULL but still enriches game', async () => {
+    const fakeFetch = vi.fn(async (url: string) => {
+      if (url.includes('GetOwnedGames')) {
+        return new Response(
+          JSON.stringify({
+            response: {
+              game_count: 1,
+              games: [{ appid: 999, name: 'Indie', playtime_forever: 50, rtime_last_played: 0 }],
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('appdetails')) {
+        return new Response(
+          JSON.stringify({
+            '999': {
+              success: true,
+              data: {
+                type: 'game',
+                name: 'Indie',
+                header_image: 'https://cdn.example/h.jpg',
+                categories: [{ id: 2, description: 'Single-player' }],
+              },
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('appreviews')) {
+        return new Response('error', { status: 500 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    await syncSteamLibrary(env, 'u1', '76561198000000001', {
+      fetchImpl: fakeFetch as typeof fetch,
+      enrichmentEnabled: true,
+    });
+
+    const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?').bind('steam-999').first();
+    expect((game as any).name).toBe('Indie');
+    expect((game as any).has_singleplayer).toBe(1);
+    expect((game as any).steam_review_pct_positive).toBeNull();
+    expect((game as any).metadata_synced_at).not.toBe('');
+  });
+});
