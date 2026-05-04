@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
 import { api, AuthError } from '../lib/api-client.js';
-import type { Group } from '@wwp/auth-shared';
+import { signOut } from '../lib/auth.js';
+
+interface GroupSummary {
+  id: string;
+  displayName: string;
+  role: string;
+  createdAt: string;
+}
 
 export default function WhosPlayingMinimal() {
-  const [groups, setGroups] = useState<Group[] | null>(null);
+  const [groups, setGroups] = useState<GroupSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createName, setCreateName] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -12,8 +19,8 @@ export default function WhosPlayingMinimal() {
   async function load() {
     setError(null);
     try {
-      const list = await api.get<Group[]>('/api/groups');
-      setGroups(list);
+      const res = await api.get<{ groups: GroupSummary[] }>('/api/groups');
+      setGroups(res.groups);
     } catch (e) {
       if (e instanceof AuthError) {
         window.location.href = '/signin';
@@ -33,7 +40,9 @@ export default function WhosPlayingMinimal() {
     setBusy(true);
     setError(null);
     try {
-      const g = await api.post<Group>('/api/groups', { displayName: createName.trim() });
+      const g = await api.post<{ id: string }>('/api/groups', {
+        displayName: createName.trim(),
+      });
       window.location.href = `/groups/${g.id}`;
     } catch (e) {
       setError((e as Error).message);
@@ -60,9 +69,12 @@ export default function WhosPlayingMinimal() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Your groups</h1>
-        <a href="/signin" className="text-sm text-muted hover:text-text">
+        <button
+          onClick={() => void signOut()}
+          className="text-sm text-muted underline hover:text-text"
+        >
           Sign out
-        </a>
+        </button>
       </header>
 
       {error && (
@@ -85,9 +97,7 @@ export default function WhosPlayingMinimal() {
                   className="block rounded border border-border bg-panel p-3 hover:border-accent"
                 >
                   <div className="font-medium">{g.displayName}</div>
-                  <div className="text-xs text-muted">
-                    {g.memberCount} member{g.memberCount === 1 ? '' : 's'}
-                  </div>
+                  <div className="text-xs text-muted">{g.role}</div>
                 </a>
               </li>
             ))}
