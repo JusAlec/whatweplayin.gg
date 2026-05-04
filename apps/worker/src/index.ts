@@ -37,7 +37,7 @@ export interface Env {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const parts = url.pathname.split('/').filter(Boolean);
 
@@ -59,7 +59,7 @@ export default {
       if (configResp) return withCors(configResp, request, env);
       const groupsResp = await dispatchGroups({ request, env, parts: apiParts });
       if (groupsResp) return withCors(groupsResp, request, env);
-      const meResp = await dispatchMe({ request, env, parts: apiParts });
+      const meResp = await dispatchMe({ request, env, parts: apiParts, ctx });
       if (meResp) return withCors(meResp, request, env);
       const invitesResp = await dispatchInvites({ request, env, parts: apiParts });
       if (invitesResp) return withCors(invitesResp, request, env);

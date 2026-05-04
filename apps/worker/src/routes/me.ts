@@ -5,10 +5,11 @@ interface RouteCtx {
   request: Request;
   env: Env;
   parts: string[];
+  ctx: ExecutionContext;
 }
 
 export async function dispatchMe(ctx: RouteCtx): Promise<Response | null> {
-  const { request, env, parts } = ctx;
+  const { request, env, parts, ctx: execCtx } = ctx;
   if (parts[0] !== 'me') return null;
 
   const session = await getSessionFromRequest(env.DB, request);
@@ -26,6 +27,41 @@ export async function dispatchMe(ctx: RouteCtx): Promise<Response | null> {
       providerUserId: r.provider_user_id as string,
       providerData: r.provider_data ? JSON.parse(r.provider_data as string) : null,
     }));
+
+    // v2.1: autosync if enabled + Steam linked + library is stale.
+    if (env.WWP_FEAT_AUTOSYNC_ON_LOGIN === 'true') {
+      const oauthRow = (await env.DB.prepare(
+        'SELECT provider_user_id FROM oauth_accounts WHERE user_id = ? AND provider = ?',
+      )
+        .bind(session.user.id, 'steam')
+        .first()) as { provider_user_id?: string } | null;
+
+      if (oauthRow?.provider_user_id) {
+        const { readNumber } = await import('../lib/flags.js');
+        const stalenessHours = readNumber(env, 'WWP_AUTOSYNC_STALENESS_HOURS', 6);
+        const stalenessMs = stalenessHours * 60 * 60 * 1000;
+        const syncedAt = session.user.steamLibrarySyncedAt;
+        const isStale = !syncedAt || Date.now() - new Date(syncedAt).getTime() > stalenessMs;
+        if (isStale) {
+          execCtx.waitUntil(
+            (async () => {
+              const { syncSteamLibrary } = await import('../lib/steam-sync.js');
+              const { SteamPrivateProfileError } = await import('../lib/steam-api.js');
+              try {
+                await syncSteamLibrary(env, session.user.id, oauthRow.provider_user_id!);
+              } catch (err) {
+                if (err instanceof SteamPrivateProfileError) {
+                  // synced_at already bumped to prevent re-fire.
+                  return;
+                }
+                console.error('autosync failed:', err);
+              }
+            })(),
+          );
+        }
+      }
+    }
+
     return jsonStatus({ user: session.user, linkedAccounts }, 200);
   }
 
