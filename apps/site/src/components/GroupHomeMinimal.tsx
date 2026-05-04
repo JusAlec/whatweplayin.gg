@@ -113,7 +113,6 @@ export default function GroupHomeMinimal({ gid }: Props) {
     if (featureFlags.recommendations && group) {
       void loadRecs();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featureFlags.recommendations, group]);
 
   async function loadLibrary(opts: { offset?: number; filter?: LibraryFilter; q?: string } = {}) {
@@ -134,7 +133,6 @@ export default function GroupHomeMinimal({ gid }: Props) {
 
   useEffect(() => {
     if (group) void loadLibrary({ offset: 0, filter: libraryFilter, q: librarySearchActive });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [group, libraryFilter, librarySearchActive]);
 
   async function createInvite() {
