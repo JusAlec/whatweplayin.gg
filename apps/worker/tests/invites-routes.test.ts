@@ -78,3 +78,97 @@ describe('GET /api/groups/:gid/invites', () => {
     expect(body.invites.length).toBe(1);
   });
 });
+
+describe('POST /api/invites/accept', () => {
+  test('valid code adds user to group', async () => {
+    const create = await SELF.fetch(`https://x/api/groups/${groupId}/invites`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSession}` },
+      body: JSON.stringify({}),
+    });
+    const { code } = (await create.json()) as { code: string };
+
+    const now = new Date().toISOString();
+    await db().users.insert({
+      id: 'u_mike', email: 'mike@test.co', emailVerified: true, displayName: 'Mike',
+      avatarUrl: null, createdAt: now, updatedAt: now,
+    });
+    const mikeSession = await createSessionForUser(env.DB, 'u_mike');
+
+    const res = await SELF.fetch('https://x/api/invites/accept', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${mikeSession}` },
+      body: JSON.stringify({ code }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { groupId: string };
+    expect(body.groupId).toBe(groupId);
+
+    const members = await db().groupMembers.listByGroup(groupId);
+    expect(members.length).toBe(2);
+    expect(members.find((m) => m.userId === 'u_mike')).toBeDefined();
+  });
+
+  test('expired invite returns 410', async () => {
+    await env.DB
+      .prepare(
+        'INSERT INTO group_invites (code, group_id, created_by, expires_at, max_uses, use_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .bind('expired1', groupId, 'u_alec', '2020-01-01T00:00:00Z', 0, 0, '2020-01-01T00:00:00Z')
+      .run();
+
+    const now = new Date().toISOString();
+    await db().users.insert({
+      id: 'u_y', email: 'y@test.co', emailVerified: true, displayName: 'Y',
+      avatarUrl: null, createdAt: now, updatedAt: now,
+    });
+    const ySession = await createSessionForUser(env.DB, 'u_y');
+
+    const res = await SELF.fetch('https://x/api/invites/accept', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${ySession}` },
+      body: JSON.stringify({ code: 'expired1' }),
+    });
+    expect(res.status).toBe(410);
+  });
+
+  test('max-uses exhausted returns 410', async () => {
+    await env.DB
+      .prepare(
+        'INSERT INTO group_invites (code, group_id, created_by, expires_at, max_uses, use_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .bind('limited1', groupId, 'u_alec',
+        new Date(Date.now() + 86_400_000).toISOString(), 1, 1, new Date().toISOString())
+      .run();
+
+    const now = new Date().toISOString();
+    await db().users.insert({
+      id: 'u_z', email: 'z@test.co', emailVerified: true, displayName: 'Z',
+      avatarUrl: null, createdAt: now, updatedAt: now,
+    });
+    const zSession = await createSessionForUser(env.DB, 'u_z');
+
+    const res = await SELF.fetch('https://x/api/invites/accept', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${zSession}` },
+      body: JSON.stringify({ code: 'limited1' }),
+    });
+    expect(res.status).toBe(410);
+  });
+
+  test('already-member is idempotent (200)', async () => {
+    const create = await SELF.fetch(`https://x/api/groups/${groupId}/invites`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSession}` },
+      body: JSON.stringify({}),
+    });
+    const { code } = (await create.json()) as { code: string };
+
+    const res = await SELF.fetch('https://x/api/invites/accept', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `wwp_session=${alecSession}` },
+      body: JSON.stringify({ code }),
+    });
+    expect(res.status).toBe(200);
+  });
+});

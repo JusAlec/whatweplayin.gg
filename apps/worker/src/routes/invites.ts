@@ -1,4 +1,4 @@
-import { CreateInviteRequestSchema } from '@wwp/auth-shared';
+import { CreateInviteRequestSchema, AcceptInviteRequestSchema } from '@wwp/auth-shared';
 import { Db } from '../lib/d1-client.js';
 import { getSessionFromRequest } from '../auth/session-helpers.js';
 import type { Env } from '../index.js';
@@ -90,6 +90,54 @@ export async function dispatchInvites(ctx: RouteCtx): Promise<Response | null> {
   }
 
   return null;
+}
+
+export async function dispatchInviteAccept(ctx: RouteCtx): Promise<Response | null> {
+  const { request, env, parts } = ctx;
+  if (parts[0] !== 'invites' || parts[1] !== 'accept') return null;
+  if (request.method !== 'POST') return null;
+
+  const session = await getSessionFromRequest(env.DB, request);
+  if (!session) return jsonStatus({ error: 'unauthorized' }, 401);
+
+  const body = await safeJson(request);
+  const parsed = AcceptInviteRequestSchema.safeParse(body);
+  if (!parsed.success) return jsonStatus({ error: 'invalid code format' }, 400);
+
+  const dbi = new Db(env.DB);
+  const invite = await dbi.groupInvites.getByCode(parsed.data.code);
+  if (!invite) return jsonStatus({ error: 'invite not found' }, 404);
+  if (new Date(invite.expiresAt).getTime() < Date.now()) {
+    return jsonStatus({ error: 'invite expired' }, 410);
+  }
+  if (invite.maxUses > 0 && invite.useCount >= invite.maxUses) {
+    return jsonStatus({ error: 'invite exhausted' }, 410);
+  }
+
+  const existing = await env.DB
+    .prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?')
+    .bind(invite.groupId, session.user.id)
+    .first();
+  if (existing) {
+    return jsonStatus({ groupId: invite.groupId, alreadyMember: true }, 200);
+  }
+
+  const now = new Date().toISOString();
+  await dbi.groupMembers.insert({
+    groupId: invite.groupId,
+    userId: session.user.id,
+    role: 'member',
+    joinedAt: now,
+    weight: 1.0,
+    stablePrefs: null,
+  });
+  await dbi.groupInvites.incrementUseCount(parsed.data.code);
+  await env.DB
+    .prepare('UPDATE groups SET member_count = member_count + 1 WHERE id = ?')
+    .bind(invite.groupId)
+    .run();
+
+  return jsonStatus({ groupId: invite.groupId, alreadyMember: false }, 200);
 }
 
 async function safeJson(req: Request): Promise<unknown> {
