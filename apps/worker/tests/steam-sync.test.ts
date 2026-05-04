@@ -362,4 +362,32 @@ describe('syncSteamLibrary — ownership removed count edge cases', () => {
     });
     expect(result.ownershipRemoved).toBe(0);
   });
+
+  test('handles libraries > 100 games (D1 bind-variable limit guard)', async () => {
+    // 250 games — well over D1's ~100 SQL bind variable limit, which used to
+    // crash sync with "too many SQL variables" on real users.
+    const games = Array.from({ length: 250 }, (_, i) => ({
+      appid: 1000 + i,
+      name: `Game${i}`,
+      playtime_forever: i,
+      rtime_last_played: 0,
+    }));
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ response: { game_count: games.length, games } }), {
+          status: 200,
+        }),
+    );
+    const result = await syncSteamLibrary(env, 'u1', '76561198000000001', {
+      fetchImpl: fakeFetch as typeof fetch,
+      enrichmentEnabled: false,
+    });
+    expect(result.gamesAdded).toBe(250);
+    const ownership = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM game_ownership WHERE user_id = ?',
+    )
+      .bind('u1')
+      .first();
+    expect((ownership as { n: number }).n).toBe(250);
+  });
 });

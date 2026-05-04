@@ -98,29 +98,40 @@ export async function syncSteamLibrary(
   return { gamesAdded, gamesUpdated, ownershipRemoved, enrichmentDeferred, syncedAt };
 }
 
+// D1 inherits SQLite's default SQLITE_MAX_VARIABLE_NUMBER, which is ~100.
+// Chunk any IN/NOT-IN clause that binds one variable per id to stay safely
+// under that limit. 80 leaves headroom for a few additional bind variables
+// in the same statement.
+const SQL_BIND_CHUNK = 80;
+
+/**
+ * Compute (current ownership) - (returnedIds) in JS, then DELETE the diff in
+ * chunks. Avoids `NOT IN (?,?,?...)` which would exceed D1's bind-variable
+ * limit on libraries with > ~100 games.
+ */
 async function removeStaleOwnership(
   env: Env,
   userId: string,
   returnedIds: string[],
 ): Promise<number> {
-  // Count first (so the result is reliable across D1 driver versions).
-  const placeholders = returnedIds.length > 0 ? returnedIds.map(() => '?').join(',') : null;
-  const countQuery = placeholders
-    ? `SELECT COUNT(*) AS n FROM game_ownership WHERE user_id = ? AND game_id NOT IN (${placeholders})`
-    : `SELECT COUNT(*) AS n FROM game_ownership WHERE user_id = ?`;
-  const countRow = (await env.DB.prepare(countQuery)
-    .bind(userId, ...returnedIds)
-    .first()) as { n: number } | null;
-  const n = countRow?.n ?? 0;
-  if (n === 0) return 0;
+  const currentResult = await env.DB.prepare('SELECT game_id FROM game_ownership WHERE user_id = ?')
+    .bind(userId)
+    .all();
+  const currentIds = (currentResult.results as Array<{ game_id: string }>).map((r) => r.game_id);
+  const returnedSet = new Set(returnedIds);
+  const stale = currentIds.filter((id) => !returnedSet.has(id));
+  if (stale.length === 0) return 0;
 
-  const deleteQuery = placeholders
-    ? `DELETE FROM game_ownership WHERE user_id = ? AND game_id NOT IN (${placeholders})`
-    : `DELETE FROM game_ownership WHERE user_id = ?`;
-  await env.DB.prepare(deleteQuery)
-    .bind(userId, ...returnedIds)
-    .run();
-  return n;
+  for (let i = 0; i < stale.length; i += SQL_BIND_CHUNK) {
+    const chunk = stale.slice(i, i + SQL_BIND_CHUNK);
+    const placeholders = chunk.map(() => '?').join(',');
+    await env.DB.prepare(
+      `DELETE FROM game_ownership WHERE user_id = ? AND game_id IN (${placeholders})`,
+    )
+      .bind(userId, ...chunk)
+      .run();
+  }
+  return stale.length;
 }
 
 async function enrichNewGames(
@@ -132,15 +143,23 @@ async function enrichNewGames(
   const parallelism = opts.enrichmentParallelism ?? 6;
 
   if (candidateGameIds.length === 0) return 0;
-  const placeholders = candidateGameIds.map(() => '?').join(',');
-  const result = await env.DB.prepare(
-    `SELECT id, steam_app_id FROM games
-        WHERE id IN (${placeholders})
-          AND (metadata_synced_at = '' OR metadata_synced_at IS NULL)`,
-  )
-    .bind(...candidateGameIds)
-    .all();
-  const toEnrich = result.results as Array<{ id: string; steam_app_id: number }>;
+
+  // Chunk the SELECT to stay under D1's bind-variable limit.
+  const toEnrich: Array<{ id: string; steam_app_id: number }> = [];
+  for (let i = 0; i < candidateGameIds.length; i += SQL_BIND_CHUNK) {
+    const chunk = candidateGameIds.slice(i, i + SQL_BIND_CHUNK);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await env.DB.prepare(
+      `SELECT id, steam_app_id FROM games
+          WHERE id IN (${placeholders})
+            AND (metadata_synced_at = '' OR metadata_synced_at IS NULL)`,
+    )
+      .bind(...chunk)
+      .all();
+    for (const row of result.results as Array<{ id: string; steam_app_id: number }>) {
+      toEnrich.push(row);
+    }
+  }
   const eligible = toEnrich.filter((row) => !isAppidSkipped(row.steam_app_id));
 
   for (let i = 0; i < eligible.length; i += parallelism) {
