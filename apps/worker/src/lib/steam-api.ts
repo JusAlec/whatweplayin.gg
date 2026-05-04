@@ -149,3 +149,30 @@ export async function fetchAppReviews(
     count: s.total_reviews,
   };
 }
+
+const SKIPPED_APPID_TTL_MS = 24 * 60 * 60 * 1000;
+
+interface SkippedEntry {
+  until: number;
+}
+
+const skippedAppIds = new Map<number, SkippedEntry>();
+
+export function isAppidSkipped(appid: number, now: Date = new Date()): boolean {
+  const entry = skippedAppIds.get(appid);
+  if (!entry) return false;
+  if (entry.until < now.getTime()) {
+    skippedAppIds.delete(appid);
+    return false;
+  }
+  return true;
+}
+
+export function markAppidSkipped(appid: number, now: Date = new Date()): void {
+  skippedAppIds.set(appid, { until: now.getTime() + SKIPPED_APPID_TTL_MS });
+}
+
+/** Test helper — clears the cache between tests to keep them deterministic. */
+export function __resetSkippedAppIdsForTesting(): void {
+  skippedAppIds.clear();
+}

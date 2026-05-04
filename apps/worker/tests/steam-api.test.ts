@@ -4,6 +4,9 @@ import {
   SteamPrivateProfileError,
   fetchAppDetails,
   fetchAppReviews,
+  isAppidSkipped,
+  markAppidSkipped,
+  __resetSkippedAppIdsForTesting,
 } from '../src/lib/steam-api.js';
 
 describe('getOwnedGames', () => {
@@ -223,5 +226,30 @@ describe('fetchAppReviews', () => {
     const fakeFetch = vi.fn(async () => new Response('error', { status: 500 }));
     const result = await fetchAppReviews(730, fakeFetch as typeof fetch);
     expect(result).toBeNull();
+  });
+});
+
+describe('skipped appid cache', () => {
+  beforeEach(() => __resetSkippedAppIdsForTesting());
+
+  test('marks and reads skipped appid', () => {
+    const now = new Date('2026-05-04T00:00:00Z');
+    expect(isAppidSkipped(123, now)).toBe(false);
+    markAppidSkipped(123, now);
+    expect(isAppidSkipped(123, now)).toBe(true);
+  });
+
+  test('expires after 24 hours', () => {
+    const start = new Date('2026-05-04T00:00:00Z');
+    markAppidSkipped(456, start);
+    const after = new Date('2026-05-05T01:00:00Z');
+    expect(isAppidSkipped(456, after)).toBe(false);
+  });
+
+  test('still skipped within 24-hour window', () => {
+    const start = new Date('2026-05-04T00:00:00Z');
+    markAppidSkipped(789, start);
+    const within = new Date('2026-05-04T20:00:00Z');
+    expect(isAppidSkipped(789, within)).toBe(true);
   });
 });
