@@ -45,6 +45,16 @@ export default function WhosPlayingMinimal() {
   }
 
   useEffect(() => {
+    // Resume a pending invite the user stashed before sign-in. This is what
+    // turns a freshly-signed-in friend into a group member without the
+    // "go back, find the invite link, paste it again" friction.
+    const pendingInvite = sessionStorage.getItem('wwp:pendingInvite');
+    if (pendingInvite) {
+      sessionStorage.removeItem('wwp:pendingInvite');
+      window.location.replace(`/invite/${encodeURIComponent(pendingInvite)}`);
+      return;
+    }
+
     // Surface link results from the Steam-link callback round trip.
     const params = new URLSearchParams(window.location.search);
     if (params.get('linked') === 'steam') {
@@ -117,12 +127,17 @@ export default function WhosPlayingMinimal() {
           ) : null}
           <h1 className="text-2xl font-semibold">{greeting}</h1>
         </div>
-        <button
-          onClick={() => void signOut()}
-          className="text-sm text-muted underline hover:text-text"
-        >
-          Sign out
-        </button>
+        <div className="flex items-center gap-3">
+          <a href="/me" className="text-sm text-muted hover:text-text">
+            Settings
+          </a>
+          <button
+            onClick={() => void signOut()}
+            className="text-sm text-muted underline hover:text-text"
+          >
+            Sign out
+          </button>
+        </div>
       </header>
 
       {linkBanner && (
