@@ -62,6 +62,14 @@ export default function WhosPlayingMinimal() {
     load();
   }, []);
 
+  // Auto-dismiss success banners after 5s; keep error banners until the user
+  // dismisses them (so they don't miss the message).
+  useEffect(() => {
+    if (linkBanner?.kind !== 'success') return;
+    const id = window.setTimeout(() => setLinkBanner(null), 5000);
+    return () => window.clearTimeout(id);
+  }, [linkBanner]);
+
   async function createGroup(e: React.FormEvent) {
     e.preventDefault();
     if (!createName.trim()) return;
@@ -119,13 +127,21 @@ export default function WhosPlayingMinimal() {
 
       {linkBanner && (
         <div
-          className={`rounded border p-3 text-sm ${
+          className={`flex items-start justify-between gap-3 rounded border p-3 text-sm ${
             linkBanner.kind === 'success'
               ? 'border-success/40 bg-success/10 text-success'
               : 'border-danger/40 bg-danger/10 text-danger'
           }`}
         >
-          {linkBanner.text}
+          <span>{linkBanner.text}</span>
+          <button
+            type="button"
+            onClick={() => setLinkBanner(null)}
+            aria-label="Dismiss"
+            className="shrink-0 px-1 leading-none opacity-70 hover:opacity-100"
+          >
+            ×
+          </button>
         </div>
       )}
 
