@@ -1,0 +1,11 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import InviteLanding from '../../components/InviteLanding.tsx';
+
+export const prerender = false;
+
+const { code } = Astro.params;
+---
+<Layout title="Invite — WhatWePlayin">
+  <InviteLanding client:load code={code!} />
+</Layout>

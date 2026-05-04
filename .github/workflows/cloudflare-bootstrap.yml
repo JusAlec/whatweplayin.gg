@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       push-secrets:
-        description: "Push BETTER_AUTH_SECRET + RESEND_API_KEY + STEAM_API_KEY to Worker (run AFTER setting GitHub secrets)"
+        description: 'Push BETTER_AUTH_SECRET + RESEND_API_KEY + STEAM_API_KEY to Worker (run AFTER setting GitHub secrets)'
         type: boolean
         default: false
 

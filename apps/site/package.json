@@ -12,19 +12,21 @@
     "lint": "echo 'lint via root eslint'"
   },
   "dependencies": {
-    "@wwp/recommender": "workspace:*",
-    "astro": "^4.5.0",
+    "@astrojs/check": "^0.5.0",
+    "@astrojs/cloudflare": "^11",
     "@astrojs/react": "^3.1.0",
     "@astrojs/tailwind": "^5.1.0",
-    "@astrojs/check": "^0.5.0",
-    "tailwindcss": "^3.4.0",
+    "@wwp/auth-shared": "workspace:^",
+    "@wwp/recommender": "workspace:*",
+    "astro": "^4.5.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^3.4.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.42.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
-    "@playwright/test": "^1.42.0",
     "typescript": "^5.4.0"
   }
 }

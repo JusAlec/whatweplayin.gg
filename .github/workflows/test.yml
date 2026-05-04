@@ -2,7 +2,7 @@ name: test
 
 on:
   push:
-    branches: [main]
+    branches: [main, v2-foundation]
   pull_request:
 
 jobs:
@@ -24,10 +24,18 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Validate catalog
+        # TODO(v2.1): replace with D1 catalog validation once games table ships.
         run: pnpm validate:catalog
 
       - name: Lint
         run: pnpm lint
+
+      - name: D1 migration syntax check
+        run: |
+          for f in apps/worker/migrations/*.sql; do
+            echo "Validating $f"
+            sqlite3 :memory: < "$f" || exit 1
+          done
 
       - name: Typecheck
         run: pnpm -r typecheck
@@ -40,17 +48,14 @@ jobs:
 
       - name: Worker tests (miniflare)
         run: pnpm --filter @wwp/worker test
+        env:
+          BETTER_AUTH_SECRET: test_secret_for_ci_only_${{ github.sha }}
 
       - name: Site build
         run: pnpm --filter @wwp/site build
 
-      - name: Install Playwright browsers
-        run: pnpm --filter @wwp/site exec playwright install --with-deps chromium
-
-      - name: E2E
-        run: pnpm --filter @wwp/site test:e2e
-        env:
-          PUBLIC_WORKER_URL: http://localhost:8787
+      # TODO(v2.1): re-add E2E tests against v2 routes (sign-in, group home, invite landing).
+      # v1 E2E suite was deleted with the v1 site surface in Batch 8.
 
   deploy-worker:
     needs: test
@@ -69,6 +74,31 @@ jobs:
 
       - name: Install
         run: pnpm install --frozen-lockfile
+
+      - name: Push Worker secrets from GitHub Secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+        run: |
+          set -euo pipefail
+          for SECRET_NAME in BETTER_AUTH_SECRET RESEND_API_KEY STEAM_API_KEY; do
+            VALUE="${!SECRET_NAME:-}"
+            if [ -z "$VALUE" ]; then
+              echo "::warning::GitHub secret $SECRET_NAME is unset; skipping"
+              continue
+            fi
+            echo "Pushing $SECRET_NAME to Worker..."
+            echo -n "$VALUE" | pnpm --filter @wwp/worker exec wrangler secret put "$SECRET_NAME"
+          done
+
+      - name: Apply D1 migrations (remote)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm --filter @wwp/worker exec wrangler d1 migrations apply whatweplayin-prod --remote
 
       - name: Deploy worker
         env:
