@@ -363,6 +363,68 @@ describe('syncSteamLibrary — ownership removed count edge cases', () => {
     expect(result.ownershipRemoved).toBe(0);
   });
 
+  test('caps enrichment per run + reports unenrichedRemaining', async () => {
+    // 30 games returned; default cap is 20 enrichments per run. The first run
+    // should enrich 20 and report 10 unenriched still pending.
+    const games = Array.from({ length: 30 }, (_, i) => ({
+      appid: 5000 + i,
+      name: `Cap${i}`,
+      playtime_forever: 0,
+      rtime_last_played: 0,
+    }));
+    let appdetailsCalls = 0;
+    const fakeFetch = vi.fn(async (url: string) => {
+      if (url.includes('GetOwnedGames')) {
+        return new Response(JSON.stringify({ response: { game_count: games.length, games } }), {
+          status: 200,
+        });
+      }
+      if (url.includes('appdetails')) {
+        appdetailsCalls++;
+        // Extract appid from the URL: ?appids=N&filters=...
+        const m = url.match(/appids=(\d+)/);
+        const appid: string = m?.[1] ?? '0';
+        return new Response(
+          JSON.stringify({
+            [appid]: {
+              success: true,
+              data: {
+                type: 'game',
+                name: `Cap${appid}`,
+                header_image: '',
+                categories: [{ id: 1, description: 'Multi-player' }],
+              },
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('appreviews')) {
+        return new Response(
+          JSON.stringify({
+            success: 1,
+            query_summary: {
+              review_score: 8,
+              review_score_desc: 'Very Positive',
+              total_positive: 90,
+              total_reviews: 100,
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response('{}', { status: 200 });
+    });
+    const result = await syncSteamLibrary(env, 'u1', '76561198000000001', {
+      fetchImpl: fakeFetch as typeof fetch,
+      enrichmentEnabled: true,
+    });
+    expect(result.gamesAdded).toBe(30);
+    expect(result.enrichmentDeferred).toBe(20);
+    expect(result.unenrichedRemaining).toBe(10);
+    expect(appdetailsCalls).toBe(20);
+  });
+
   test('handles libraries > 100 games (D1 bind-variable limit guard)', async () => {
     // 250 games — well over D1's ~100 SQL bind variable limit, which used to
     // crash sync with "too many SQL variables" on real users.

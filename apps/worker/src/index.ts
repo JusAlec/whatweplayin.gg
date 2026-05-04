@@ -37,6 +37,7 @@ export interface Env {
   WWP_WEIGHT_NOVELTY?: string;
   WWP_RECOMMENDATIONS_LIMIT?: string;
   WWP_THUMBS_DOWN_VETO_DAYS?: string;
+  WWP_ENRICHMENT_MAX_PER_RUN?: string;
 }
 
 export default {

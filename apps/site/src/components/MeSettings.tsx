@@ -14,6 +14,7 @@ interface SyncResultBody {
   gamesAdded: number;
   gamesUpdated: number;
   ownershipRemoved: number;
+  unenrichedRemaining: number;
   syncedAt: string;
 }
 
@@ -51,10 +52,12 @@ export default function MeSettings() {
     setSyncMsg(null);
     try {
       const r = await api.post<SyncResultBody>('/api/me/sync/steam', {});
-      setSyncMsg({
-        kind: 'success',
-        text: `Synced. +${r.gamesAdded} new, ${r.gamesUpdated} updated, -${r.ownershipRemoved} removed.`,
-      });
+      const base = `Synced. +${r.gamesAdded} new, ${r.gamesUpdated} updated, -${r.ownershipRemoved} removed.`;
+      const remainingNote =
+        r.unenrichedRemaining > 0
+          ? ` ${r.unenrichedRemaining} games still need metadata — click Refresh again to continue.`
+          : '';
+      setSyncMsg({ kind: 'success', text: base + remainingNote });
       await load();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

@@ -9,6 +9,7 @@ import {
 } from './steam-api.js';
 import type { Env } from '../index.js';
 import { Db } from './d1-client.js';
+import { readNumber } from './flags.js';
 
 export interface SyncOptions {
   fetchImpl?: typeof fetch;
@@ -20,7 +21,16 @@ export interface SyncResult {
   gamesAdded: number;
   gamesUpdated: number;
   ownershipRemoved: number;
+  /** How many games we attempted to enrich during this invocation. */
   enrichmentDeferred: number;
+  /**
+   * How many games owned by this user are STILL un-enriched after this run.
+   * Non-zero means the user should click Refresh library again to continue
+   * (we can't process all enrichments in one Cloudflare Workers invocation
+   * because of the per-invocation subrequest cap on the free tier — see
+   * WWP_ENRICHMENT_MAX_PER_RUN).
+   */
+  unenrichedRemaining: number;
   syncedAt: string;
 }
 
@@ -95,7 +105,31 @@ export async function syncSteamLibrary(
     enrichmentDeferred = await enrichNewGames(env, returnedIds, opts);
   }
 
-  return { gamesAdded, gamesUpdated, ownershipRemoved, enrichmentDeferred, syncedAt };
+  // Count games owned by this user that are still un-enriched. If non-zero,
+  // the caller should re-trigger sync (or we should run another round via
+  // autosync on next /api/me hit) to continue enrichment.
+  const unenrichedRemaining = await countUnenrichedForUser(env, userId);
+
+  return {
+    gamesAdded,
+    gamesUpdated,
+    ownershipRemoved,
+    enrichmentDeferred,
+    unenrichedRemaining,
+    syncedAt,
+  };
+}
+
+async function countUnenrichedForUser(env: Env, userId: string): Promise<number> {
+  const row = (await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM games g
+        JOIN game_ownership go ON go.game_id = g.id
+       WHERE go.user_id = ?
+         AND (g.metadata_synced_at = '' OR g.metadata_synced_at IS NULL)`,
+  )
+    .bind(userId)
+    .first()) as { n: number } | null;
+  return row?.n ?? 0;
 }
 
 // D1 inherits SQLite's default SQLITE_MAX_VARIABLE_NUMBER, which is ~100.
@@ -141,6 +175,12 @@ async function enrichNewGames(
 ): Promise<number> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const parallelism = opts.enrichmentParallelism ?? 6;
+  // Cloudflare Workers free tier caps subrequests per invocation at 50.
+  // Each enrichment costs 2 HTTP calls (appdetails + appreviews); GetOwnedGames
+  // is one more, plus a small headroom. 20 enrichments × 2 + 1 = 41 < 50.
+  // Tunable via WWP_ENRICHMENT_MAX_PER_RUN. Subsequent sync calls continue
+  // where this one left off (idempotent: only un-enriched rows are touched).
+  const maxPerRun = readNumber(env, 'WWP_ENRICHMENT_MAX_PER_RUN', 20);
 
   if (candidateGameIds.length === 0) return 0;
 
@@ -160,7 +200,7 @@ async function enrichNewGames(
       toEnrich.push(row);
     }
   }
-  const eligible = toEnrich.filter((row) => !isAppidSkipped(row.steam_app_id));
+  const eligible = toEnrich.filter((row) => !isAppidSkipped(row.steam_app_id)).slice(0, maxPerRun);
 
   for (let i = 0; i < eligible.length; i += parallelism) {
     const batch = eligible.slice(i, i + parallelism);
