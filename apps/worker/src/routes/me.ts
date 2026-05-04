@@ -69,6 +69,39 @@ export async function dispatchMe(ctx: RouteCtx): Promise<Response | null> {
     return jsonStatus({ ok: true, provider }, 200);
   }
 
+  // POST /api/me/sync/steam — manual library refresh (blocking, full pipeline)
+  if (
+    parts.length === 3 &&
+    parts[1] === 'sync' &&
+    parts[2] === 'steam' &&
+    request.method === 'POST'
+  ) {
+    const oauthRow = (await env.DB.prepare(
+      'SELECT provider_user_id FROM oauth_accounts WHERE user_id = ? AND provider = ?',
+    )
+      .bind(session.user.id, 'steam')
+      .first()) as { provider_user_id?: string } | null;
+    if (!oauthRow?.provider_user_id) {
+      return jsonStatus({ error: 'no-steam-linked' }, 400);
+    }
+
+    try {
+      const { syncSteamLibrary } = await import('../lib/steam-sync.js');
+      const result = await syncSteamLibrary(env, session.user.id, oauthRow.provider_user_id);
+      return jsonStatus({ ok: true, ...result }, 200);
+    } catch (err) {
+      const { SteamPrivateProfileError } = await import('../lib/steam-api.js');
+      if (err instanceof SteamPrivateProfileError) {
+        return jsonStatus(
+          { error: 'steam-private', helpUrl: 'https://steamcommunity.com/my/edit/settings' },
+          422,
+        );
+      }
+      console.error('manual sync failed:', err);
+      return jsonStatus({ error: 'sync-failed', message: String(err) }, 502);
+    }
+  }
+
   return null;
 }
 
