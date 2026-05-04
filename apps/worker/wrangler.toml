@@ -10,3 +10,12 @@ preview_id = "43e751f40669435aacac776316358cd5"
 
 [observability]
 enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "whatweplayin-prod"
+database_id = "PLACEHOLDER_REPLACE_AFTER_CREATE"
+migrations_dir = "migrations"
+
+[triggers]
+crons = ["0 3 * * *"]  # Daily 03:00 UTC — Steam library sync + rating cache rebuild
