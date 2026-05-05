@@ -33,6 +33,7 @@ export async function dispatchRecommendations(ctx: RouteCtx): Promise<Response |
     thumbs: readNumber(env, 'WWP_WEIGHT_THUMBS', 0.5),
     ownership: readNumber(env, 'WWP_WEIGHT_OWNERSHIP', 0.3),
     novelty: readNumber(env, 'WWP_WEIGHT_NOVELTY', 0.2),
+    groupFit: readNumber(env, 'WWP_WEIGHT_GROUPFIT', 0.2),
   };
   const limit = readNumber(env, 'WWP_RECOMMENDATIONS_LIMIT', 5);
   const vetoDays = readNumber(env, 'WWP_THUMBS_DOWN_VETO_DAYS', 7);

@@ -5,7 +5,7 @@ export interface RankInput {
   candidates: EnrichedGameForRanking[];
   thumbs: Map<string, Array<{ userId: string; vote: -1 | 1 }>>;
   ownership: Map<string, { ownerCount: number; maxLastPlayed: string | null }>;
-  weights: { thumbs: number; ownership: number; novelty: number };
+  weights: { thumbs: number; ownership: number; novelty: number; groupFit: number };
   now: Date;
 }
 
@@ -14,6 +14,8 @@ export interface EnrichedGameForRanking {
   name: string;
   steamReviewPctPositive: number | null;
   metadataSyncedAt: string | null;
+  optimalMin?: number | null; // v2.2 — IGDB-derived player range
+  optimalMax?: number | null;
 }
 
 export type GameFlag = 'cold-start' | 'low-confidence' | 'not-enriched' | 'never-played';
@@ -22,10 +24,10 @@ export interface RankResult {
   picks: Array<{
     gameId: string;
     score: number;
-    breakdown: { thumbs: number; ownership: number; novelty: number };
+    breakdown: { thumbs: number; ownership: number; novelty: number; groupFit: number };
     flags: GameFlag[];
   }>;
-  weightsUsed: { thumbs: number; ownership: number; novelty: number };
+  weightsUsed: { thumbs: number; ownership: number; novelty: number; groupFit: number };
   coldStart: boolean;
 }
 
@@ -113,7 +115,7 @@ export function rankByThumbs(input: RankInput): RankResult {
   const picks: Array<{
     gameId: string;
     score: number;
-    breakdown: { thumbs: number; ownership: number; novelty: number };
+    breakdown: { thumbs: number; ownership: number; novelty: number; groupFit: number };
     flags: GameFlag[];
     steamPct: number | null;
     name: string;
@@ -137,11 +139,17 @@ export function rankByThumbs(input: RankInput): RankResult {
       maxLastPlayed: ownership.maxLastPlayed,
       now: input.now,
     });
+    const groupFit = computeGroupFitScore({
+      groupSize: input.group.size,
+      optimalMin: game.optimalMin ?? null,
+      optimalMax: game.optimalMax ?? null,
+    });
 
     const score =
       input.weights.thumbs * thumbsScore +
       input.weights.ownership * ownershipScore +
-      input.weights.novelty * noveltyScore;
+      input.weights.novelty * noveltyScore +
+      input.weights.groupFit * groupFit;
 
     const flags: GameFlag[] = [];
     if (coldStart) flags.push('cold-start');
@@ -152,7 +160,7 @@ export function rankByThumbs(input: RankInput): RankResult {
     picks.push({
       gameId: game.id,
       score,
-      breakdown: { thumbs: thumbsScore, ownership: ownershipScore, novelty: noveltyScore },
+      breakdown: { thumbs: thumbsScore, ownership: ownershipScore, novelty: noveltyScore, groupFit },
       flags,
       steamPct: game.steamReviewPctPositive,
       name: game.name,
