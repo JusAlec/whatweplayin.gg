@@ -120,8 +120,11 @@ describe('fetchIGDBGameByAppId', () => {
   });
 
   test('builds APICalypse query with external_games filter', async () => {
-    const fakeFetch = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
-    await fetchIGDBGameByAppId(env, 730, fakeFetch as typeof fetch);
+    const fakeFetch = vi.fn(
+      async (_url: string | URL | Request, _init?: RequestInit) =>
+        new Response(JSON.stringify([]), { status: 200 }),
+    );
+    await fetchIGDBGameByAppId(env, 730, fakeFetch as unknown as typeof fetch);
     const [, init] = fakeFetch.mock.calls[0]!;
     const body = (init as RequestInit).body as string;
     expect(body).toContain('external_games.category = 1');
