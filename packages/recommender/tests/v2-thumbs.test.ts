@@ -3,6 +3,7 @@ import {
   computeThumbsScore,
   computeOwnershipScore,
   computeNoveltyScore,
+  computeGroupFitScore,
   rankByThumbs,
 } from '../src/v2-thumbs.js';
 
@@ -310,5 +311,31 @@ describe('rankByThumbs', () => {
       now: NOW,
     });
     expect(result.weightsUsed).toEqual({ thumbs: 0.6, ownership: 0.2, novelty: 0.2 });
+  });
+});
+
+describe('computeGroupFitScore', () => {
+  test('returns 1.0 inside the optimal range', () => {
+    expect(computeGroupFitScore({ groupSize: 4, optimalMin: 2, optimalMax: 6 })).toBeCloseTo(1.0);
+    expect(computeGroupFitScore({ groupSize: 2, optimalMin: 2, optimalMax: 6 })).toBeCloseTo(1.0);
+    expect(computeGroupFitScore({ groupSize: 6, optimalMin: 2, optimalMax: 6 })).toBeCloseTo(1.0);
+  });
+
+  test('decays at -0.25 per step below the range, floors at 0', () => {
+    expect(computeGroupFitScore({ groupSize: 1, optimalMin: 2, optimalMax: 6 })).toBeCloseTo(0.75);
+    expect(computeGroupFitScore({ groupSize: 1, optimalMin: 4, optimalMax: 6 })).toBeCloseTo(0.25);
+    expect(computeGroupFitScore({ groupSize: 1, optimalMin: 8, optimalMax: 10 })).toBe(0); // floored
+  });
+
+  test('decays at -0.15 per step above the range, floors at 0', () => {
+    expect(computeGroupFitScore({ groupSize: 7, optimalMin: 2, optimalMax: 6 })).toBeCloseTo(0.85);
+    expect(computeGroupFitScore({ groupSize: 8, optimalMin: 2, optimalMax: 6 })).toBeCloseTo(0.7);
+    expect(computeGroupFitScore({ groupSize: 20, optimalMin: 2, optimalMax: 6 })).toBe(0);
+  });
+
+  test('returns 0.5 when optimal range is missing (neutral fallback)', () => {
+    expect(computeGroupFitScore({ groupSize: 4, optimalMin: null, optimalMax: null })).toBe(0.5);
+    expect(computeGroupFitScore({ groupSize: 4, optimalMin: 2, optimalMax: null })).toBe(0.5);
+    expect(computeGroupFitScore({ groupSize: 4, optimalMin: null, optimalMax: 6 })).toBe(0.5);
   });
 });
