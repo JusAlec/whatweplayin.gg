@@ -14,27 +14,97 @@ interface GameSummary {
 
 export interface GameCardProps {
   game: GameSummary;
-  groupId: string;
-  ownerCount: number;
-  groupSize: number;
-  thumbs: { up: number; down: number };
-  yourVote: -1 | 0 | 1;
+  variant?: 'default' | 'compact';
+  onClick?: () => void;
+  // Default variant only:
+  groupId?: string;
+  ownerCount?: number;
+  groupSize?: number;
+  thumbs?: { up: number; down: number };
+  yourVote?: -1 | 0 | 1;
   flags?: string[];
   showThumbs?: boolean;
   showRating?: boolean;
 }
 
-export default function GameCard({
+export default function GameCard(props: GameCardProps) {
+  const { game, variant, onClick } = props;
+
+  // Compact variant — only needs game.name and game.coverUrl
+  if (variant === 'compact') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="group relative h-44 w-32 shrink-0 overflow-hidden rounded border border-border bg-panel transition hover:border-accent focus:border-accent focus:outline-none"
+        aria-label={`Open ${game.name}`}
+      >
+        {game.coverUrl ? (
+          <img
+            src={game.coverUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-bg" />
+        )}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-2 text-left">
+          <div className="line-clamp-2 text-xs font-medium text-white">{game.name}</div>
+        </div>
+      </button>
+    );
+  }
+
+  // Default variant — all original props required at runtime
+  const {
+    groupId = '',
+    ownerCount = 0,
+    groupSize = 0,
+    thumbs = { up: 0, down: 0 },
+    yourVote = 0,
+    flags = [],
+    showThumbs = true,
+    showRating = true,
+  } = props;
+
+  return (
+    <DefaultCard
+      game={game}
+      groupId={groupId}
+      ownerCount={ownerCount}
+      groupSize={groupSize}
+      thumbs={thumbs}
+      yourVote={yourVote}
+      flags={flags}
+      showThumbs={showThumbs}
+      showRating={showRating}
+    />
+  );
+}
+
+// Internal component keeps hooks unconditional (rules of hooks)
+function DefaultCard({
   game,
   groupId,
   ownerCount,
   groupSize,
   thumbs,
   yourVote,
-  flags = [],
-  showThumbs = true,
-  showRating = true,
-}: GameCardProps) {
+  flags,
+  showThumbs,
+  showRating,
+}: {
+  game: GameSummary;
+  groupId: string;
+  ownerCount: number;
+  groupSize: number;
+  thumbs: { up: number; down: number };
+  yourVote: -1 | 0 | 1;
+  flags: string[];
+  showThumbs: boolean;
+  showRating: boolean;
+}) {
   const [vote, setVote] = useState<-1 | 0 | 1>(yourVote);
   const [busy, setBusy] = useState(false);
   const [counts, setCounts] = useState(thumbs);
