@@ -5,7 +5,7 @@
 1. **Create Cloudflare account** (free) at https://dash.cloudflare.com.
 2. **Create KV namespace**:
    ```
-   pnpm --filter @wwp/worker exec wrangler kv:namespace create KV
+   pnpm --filter @wwp/worker exec wrangler kv namespace create KV
    ```
    Note the returned `id` and `preview_id`. Paste both into `apps/worker/wrangler.toml`.
 3. **Generate group secret**:
@@ -15,7 +15,7 @@
    Copy the printed secret.
 4. **Write the secret to KV**:
    ```
-   pnpm --filter @wwp/worker exec wrangler kv:key put --binding=KV "group:mygroup:secret" "<paste secret>"
+   pnpm --filter @wwp/worker exec wrangler kv key put --binding=KV "group:mygroup:secret" "<paste secret>"
    ```
 5. **Deploy the worker**:
    ```
