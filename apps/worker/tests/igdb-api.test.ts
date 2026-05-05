@@ -1,7 +1,7 @@
 import { test, expect, describe, beforeEach, vi } from 'vitest';
 // @ts-expect-error - cloudflare:test is provided by @cloudflare/vitest-pool-workers
 import { env } from 'cloudflare:test';
-import { getIGDBToken } from '../src/lib/igdb-api.js';
+import { getIGDBToken, fetchIGDBGameByAppId, type IGDBGame } from '../src/lib/igdb-api.js';
 
 beforeEach(async () => {
   env.IGDB_CLIENT_ID = 'test-client-id';
@@ -65,5 +65,69 @@ describe('getIGDBToken', () => {
     env.IGDB_CLIENT_SECRET = '';
     const fakeFetch = vi.fn();
     await expect(getIGDBToken(env, fakeFetch as typeof fetch)).rejects.toThrow();
+  });
+});
+
+async function seedToken() {
+  const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  await env.DB.prepare(
+    'INSERT INTO igdb_token (id, access_token, expires_at, refreshed_at) VALUES (1, ?, ?, ?)',
+  )
+    .bind('tok-test', future, new Date().toISOString())
+    .run();
+}
+
+describe('fetchIGDBGameByAppId', () => {
+  beforeEach(seedToken);
+
+  test('returns parsed game data on success', async () => {
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify([
+            {
+              name: 'Counter-Strike 2',
+              summary: 'Free-to-play tactical shooter.',
+              genres: [{ name: 'Shooter' }, { name: 'Strategy' }],
+              multiplayer_modes: [{ online_max: 10, online_coop_max: 0, lan_max: 10 }],
+              cover: { image_id: 'co1abc' },
+              screenshots: [{ image_id: 'sc1xyz' }],
+            },
+          ]),
+          { status: 200 },
+        ),
+    );
+    const game = await fetchIGDBGameByAppId(env, 730, fakeFetch as typeof fetch);
+    expect(game).not.toBeNull();
+    expect(game!.name).toBe('Counter-Strike 2');
+    expect(game!.summary).toContain('shooter');
+    expect(game!.genres).toEqual([{ name: 'Shooter' }, { name: 'Strategy' }]);
+    expect(game!.multiplayer_modes![0]!.online_max).toBe(10);
+    expect(game!.cover!.image_id).toBe('co1abc');
+    expect(game!.screenshots![0]!.image_id).toBe('sc1xyz');
+  });
+
+  test('returns null when game is not in IGDB', async () => {
+    const fakeFetch = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
+    const game = await fetchIGDBGameByAppId(env, 99999, fakeFetch as typeof fetch);
+    expect(game).toBeNull();
+  });
+
+  test('returns null on HTTP error (not throwing — caller decides)', async () => {
+    const fakeFetch = vi.fn(async () => new Response('rate limited', { status: 429 }));
+    const game = await fetchIGDBGameByAppId(env, 730, fakeFetch as typeof fetch);
+    expect(game).toBeNull();
+  });
+
+  test('builds APICalypse query with external_games filter', async () => {
+    const fakeFetch = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
+    await fetchIGDBGameByAppId(env, 730, fakeFetch as typeof fetch);
+    const [, init] = fakeFetch.mock.calls[0]!;
+    const body = (init as RequestInit).body as string;
+    expect(body).toContain('external_games.category = 1');
+    expect(body).toContain('external_games.uid = "730"');
+    expect(body).toContain('limit 1');
+    expect(body).toContain('genres.name');
+    expect(body).toContain('multiplayer_modes');
   });
 });

@@ -66,3 +66,58 @@ export async function getIGDBToken(env: Env, fetchImpl: typeof fetch = fetch): P
     .run();
   return data.access_token;
 }
+
+const IGDB_GAMES_URL = 'https://api.igdb.com/v4/games';
+
+export interface IGDBGame {
+  name: string;
+  summary?: string;
+  genres?: Array<{ name: string }>;
+  multiplayer_modes?: Array<{
+    online_max?: number;
+    online_coop_max?: number;
+    lan_max?: number;
+  }>;
+  cover?: { image_id: string };
+  screenshots?: Array<{ image_id: string }>;
+}
+
+/**
+ * Fetch an IGDB game by Steam app ID. Returns null on not-found or HTTP error
+ * (caller treats as "no IGDB data"; row stays un-IGDB-enriched and retries
+ * next sync round).
+ */
+export async function fetchIGDBGameByAppId(
+  env: Env,
+  steamAppId: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<IGDBGame | null> {
+  const clientId = env.IGDB_CLIENT_ID;
+  if (!clientId) return null;
+
+  let token: string;
+  try {
+    token = await getIGDBToken(env, fetchImpl);
+  } catch (err) {
+    console.error('IGDB token fetch failed:', err);
+    return null;
+  }
+
+  const body = `fields name, summary, genres.name, multiplayer_modes.online_max, multiplayer_modes.online_coop_max, multiplayer_modes.lan_max, cover.image_id, screenshots.image_id;
+where external_games.category = 1 & external_games.uid = "${steamAppId}";
+limit 1;`;
+
+  const res = await fetchImpl(IGDB_GAMES_URL, {
+    method: 'POST',
+    headers: {
+      'Client-ID': clientId,
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+    body,
+  });
+  if (!res.ok) return null;
+
+  const data = (await res.json()) as IGDBGame[];
+  return data[0] ?? null;
+}
