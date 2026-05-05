@@ -104,3 +104,28 @@ export function RefreshIcon({ size = 16, className }: IconProps) {
     </svg>
   );
 }
+
+export function SearchIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg {...baseProps(size, className)}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+export function ChevronRightIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg {...baseProps(size, className)}>
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
+export function ChevronLeftIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg {...baseProps(size, className)}>
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  );
+}
