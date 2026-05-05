@@ -160,8 +160,6 @@ describe('GET /api/groups/:gid/library', () => {
 });
 
 describe('GET /api/groups/:gid/library?preset=', () => {
-  let bobSession: string;
-
   beforeEach(async () => {
     // Seed u_bob and add to the group
     await db().users.insert({
@@ -173,7 +171,6 @@ describe('GET /api/groups/:gid/library?preset=', () => {
       createdAt: NOW,
       updatedAt: NOW,
     });
-    bobSession = await createSessionForUser(env.DB, 'u_bob');
     await env.DB.prepare(
       'INSERT INTO group_members (group_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)',
     )

@@ -21,11 +21,13 @@
 ### Task 1: D1 migration 0006
 
 **Files:**
+
 - Create: `apps/worker/migrations/0006_v22_igdb_metadata.sql`
 
 - [ ] **Step 1: Write the migration**
 
 `apps/worker/migrations/0006_v22_igdb_metadata.sql`:
+
 ```sql
 -- v2.2: IGDB metadata layered on top of Steam Store + Twitch OAuth token cache
 
@@ -61,6 +63,7 @@ git commit -m "feat(d1): migration 0006 — IGDB description/genres/screenshot +
 ### Task 2: Extend `@wwp/auth-shared` types
 
 **Files:**
+
 - Modify: `packages/auth-shared/src/types.ts`
 
 - [ ] **Step 1: Append v2.2 types at the end of the file**
@@ -132,6 +135,7 @@ git commit -m "feat(auth-shared): v2.2 types — GameV22, MemberOwnership, GameD
 ### Task 3: Worker Env interface + wrangler.toml feature flags
 
 **Files:**
+
 - Modify: `apps/worker/src/index.ts`
 - Modify: `apps/worker/wrangler.toml`
 
@@ -207,6 +211,7 @@ git commit -m "feat(worker): v2.2 env vars — IGDB flag, groupFit weight, rebal
 ### Task 4: Update `docs/feature-flags.md`
 
 **Files:**
+
 - Modify: `docs/feature-flags.md`
 
 - [ ] **Step 1: Read the current file**
@@ -220,6 +225,7 @@ You'll see a "v2.1 flags" table.
 - [ ] **Step 2: Update existing rows + append v2.2 rows**
 
 Find the row for `WWP_WEIGHT_THUMBS`. Change its default cell from `"0.5"` to `"0.4"`. Same for:
+
 - `WWP_WEIGHT_OWNERSHIP`: `"0.3"` → `"0.2"`
 - `WWP_ENRICHMENT_MAX_PER_RUN`: `"20"` → `"13"`
 
@@ -228,11 +234,11 @@ Then append new rows below the v2.1 section:
 ```markdown
 ## v2.2 flags
 
-| Flag | Type | Default | Helper | When ON / set | When OFF / unset | Notes |
-|---|---|---|---|---|---|---|
-| `WWP_FEAT_IGDB` | bool | `"true"` | `flagOn` | enrichOne calls IGDB games endpoint after Steam Store; populates description/genres/igdb_screenshot_id/optimal_min/max | IGDB step skipped; sync stays Steam-only | Flip to `"false"` if IGDB has an outage |
-| `WWP_WEIGHT_GROUPFIT` | number | `"0.2"` | `readNumber` | recommender weight on the groupFit axis (player-count-fit) | (n/a) | Defaults sum to 1.0 with rebalanced thumbs/ownership |
-| `WWP_HIDDEN_GEMS_PLAYTIME_THRESHOLD` | number | `"600"` | `readNumber` | playtime ceiling (minutes) for the hidden-gems library preset; games with total group playtime ≤ this AND review pct ≥ 75 qualify | (n/a) | Increase if hidden-gems row is sparse |
+| Flag                                 | Type   | Default  | Helper       | When ON / set                                                                                                                     | When OFF / unset                         | Notes                                                |
+| ------------------------------------ | ------ | -------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ---------------------------------------------------- |
+| `WWP_FEAT_IGDB`                      | bool   | `"true"` | `flagOn`     | enrichOne calls IGDB games endpoint after Steam Store; populates description/genres/igdb_screenshot_id/optimal_min/max            | IGDB step skipped; sync stays Steam-only | Flip to `"false"` if IGDB has an outage              |
+| `WWP_WEIGHT_GROUPFIT`                | number | `"0.2"`  | `readNumber` | recommender weight on the groupFit axis (player-count-fit)                                                                        | (n/a)                                    | Defaults sum to 1.0 with rebalanced thumbs/ownership |
+| `WWP_HIDDEN_GEMS_PLAYTIME_THRESHOLD` | number | `"600"`  | `readNumber` | playtime ceiling (minutes) for the hidden-gems library preset; games with total group playtime ≤ this AND review pct ≥ 75 qualify | (n/a)                                    | Increase if hidden-gems row is sparse                |
 ```
 
 - [ ] **Step 3: Commit**
@@ -249,12 +255,14 @@ git commit -m "docs(flags): v2.2 — IGDB, groupFit, hidden-gems threshold + reb
 ### Task 5: Twitch OAuth token caching
 
 **Files:**
+
 - Create: `apps/worker/src/lib/igdb-api.ts`
 - Create: `apps/worker/tests/igdb-api.test.ts`
 
 - [ ] **Step 1: Write the test first**
 
 `apps/worker/tests/igdb-api.test.ts`:
+
 ```ts
 import { test, expect, describe, beforeEach, vi } from 'vitest';
 // @ts-expect-error - cloudflare:test is provided by @cloudflare/vitest-pool-workers
@@ -284,10 +292,9 @@ describe('getIGDBToken', () => {
 
   test('returns cached token when far from expiry', async () => {
     const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    await env.DB
-      .prepare(
-        'INSERT INTO igdb_token (id, access_token, expires_at, refreshed_at) VALUES (1, ?, ?, ?)',
-      )
+    await env.DB.prepare(
+      'INSERT INTO igdb_token (id, access_token, expires_at, refreshed_at) VALUES (1, ?, ?, ?)',
+    )
       .bind('tok-cached', future, new Date().toISOString())
       .run();
     const fakeFetch = vi.fn();
@@ -298,18 +305,16 @@ describe('getIGDBToken', () => {
 
   test('refreshes when within 24h of expiry', async () => {
     const soon = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
-    await env.DB
-      .prepare(
-        'INSERT INTO igdb_token (id, access_token, expires_at, refreshed_at) VALUES (1, ?, ?, ?)',
-      )
+    await env.DB.prepare(
+      'INSERT INTO igdb_token (id, access_token, expires_at, refreshed_at) VALUES (1, ?, ?, ?)',
+    )
       .bind('tok-stale', soon, new Date().toISOString())
       .run();
     const fakeFetch = vi.fn(
       async () =>
-        new Response(
-          JSON.stringify({ access_token: 'tok-refreshed', expires_in: 5184000 }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ access_token: 'tok-refreshed', expires_in: 5184000 }), {
+          status: 200,
+        }),
     );
     const token = await getIGDBToken(env, fakeFetch as typeof fetch);
     expect(token).toBe('tok-refreshed');
@@ -432,6 +437,7 @@ git commit -m "feat(worker): IGDB Twitch OAuth token caching with D1 singleton +
 ### Task 6: IGDB game lookup by Steam app ID
 
 **Files:**
+
 - Modify: `apps/worker/src/lib/igdb-api.ts`
 - Modify: `apps/worker/tests/igdb-api.test.ts`
 
@@ -442,10 +448,9 @@ import { fetchIGDBGameByAppId, type IGDBGame } from '../src/lib/igdb-api.js';
 
 async function seedToken() {
   const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  await env.DB
-    .prepare(
-      'INSERT INTO igdb_token (id, access_token, expires_at, refreshed_at) VALUES (1, ?, ?, ?)',
-    )
+  await env.DB.prepare(
+    'INSERT INTO igdb_token (id, access_token, expires_at, refreshed_at) VALUES (1, ?, ?, ?)',
+  )
     .bind('tok-test', future, new Date().toISOString())
     .run();
 }
@@ -493,9 +498,7 @@ describe('fetchIGDBGameByAppId', () => {
   });
 
   test('builds APICalypse query with external_games filter', async () => {
-    const fakeFetch = vi.fn(
-      async () => new Response(JSON.stringify([]), { status: 200 }),
-    );
+    const fakeFetch = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
     await fetchIGDBGameByAppId(env, 730, fakeFetch as typeof fetch);
     const [, init] = fakeFetch.mock.calls[0]!;
     const body = (init as RequestInit).body as string;
@@ -600,6 +603,7 @@ git commit -m "feat(worker): IGDB games lookup by Steam app ID via APICalypse re
 ### Task 7: enrichOne pulls IGDB data alongside Steam
 
 **Files:**
+
 - Modify: `apps/worker/src/lib/steam-sync.ts`
 - Modify: `apps/worker/tests/steam-sync.test.ts`
 
@@ -623,10 +627,9 @@ describe('syncSteamLibrary — IGDB enrichment integration', () => {
     env.WWP_FEAT_IGDB = 'true';
     // seed a fresh IGDB token so getIGDBToken doesn't try to call Twitch.
     const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    await env.DB
-      .prepare(
-        'INSERT OR REPLACE INTO igdb_token (id, access_token, expires_at, refreshed_at) VALUES (1, ?, ?, ?)',
-      )
+    await env.DB.prepare(
+      'INSERT OR REPLACE INTO igdb_token (id, access_token, expires_at, refreshed_at) VALUES (1, ?, ?, ?)',
+    )
       .bind('tok', future, new Date().toISOString())
       .run();
   });
@@ -667,7 +670,12 @@ describe('syncSteamLibrary — IGDB enrichment integration', () => {
         return new Response(
           JSON.stringify({
             success: 1,
-            query_summary: { review_score: 9, review_score_desc: 'OP', total_positive: 95, total_reviews: 100 },
+            query_summary: {
+              review_score: 9,
+              review_score_desc: 'OP',
+              total_positive: 95,
+              total_reviews: 100,
+            },
           }),
           { status: 200 },
         );
@@ -696,9 +704,7 @@ describe('syncSteamLibrary — IGDB enrichment integration', () => {
       enrichmentParallelism: 1,
     });
 
-    const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?')
-      .bind('steam-730')
-      .first();
+    const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?').bind('steam-730').first();
     expect((game as any).description).toBe('Tactical shooter.');
     expect(JSON.parse((game as any).genres)).toEqual(['Shooter']);
     expect((game as any).igdb_screenshot_id).toBe('sc1xyz');
@@ -733,7 +739,10 @@ describe('syncSteamLibrary — IGDB enrichment integration', () => {
       }
       if (url.includes('appreviews')) {
         return new Response(
-          JSON.stringify({ success: 1, query_summary: { review_score: 0, total_positive: 0, total_reviews: 0 } }),
+          JSON.stringify({
+            success: 1,
+            query_summary: { review_score: 0, total_positive: 0, total_reviews: 0 },
+          }),
           { status: 200 },
         );
       }
@@ -769,7 +778,12 @@ describe('syncSteamLibrary — IGDB enrichment integration', () => {
           JSON.stringify({
             '99999': {
               success: true,
-              data: { type: 'game', name: 'Obscure', header_image: 'h.jpg', categories: [{ id: 2, description: 'Single-player' }] },
+              data: {
+                type: 'game',
+                name: 'Obscure',
+                header_image: 'h.jpg',
+                categories: [{ id: 2, description: 'Single-player' }],
+              },
             },
           }),
           { status: 200 },
@@ -787,7 +801,9 @@ describe('syncSteamLibrary — IGDB enrichment integration', () => {
       fetchImpl: fakeFetch as typeof fetch,
       enrichmentEnabled: true,
     });
-    const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?').bind('steam-99999').first();
+    const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?')
+      .bind('steam-99999')
+      .first();
     expect((game as any).name).toBe('Obscure');
     expect((game as any).has_singleplayer).toBe(1);
     expect((game as any).description).toBeNull();
@@ -844,8 +860,7 @@ async function enrichOne(
         igdbDescription = igdb.summary ?? null;
         igdbGenres = (igdb.genres ?? []).map((g) => g.name);
         // Prefer the first screenshot; fall back to cover for the hero backdrop.
-        igdbScreenshotId =
-          igdb.screenshots?.[0]?.image_id ?? igdb.cover?.image_id ?? null;
+        igdbScreenshotId = igdb.screenshots?.[0]?.image_id ?? igdb.cover?.image_id ?? null;
         const optimal = deriveOptimalPlayerCount(
           igdb.multiplayer_modes ?? [],
           details.hasSinglePlayer,
@@ -958,6 +973,7 @@ git commit -m "feat(worker): enrichOne layers IGDB on top of Steam Store; parall
 ### Task 8: `computeGroupFitScore` unit
 
 **Files:**
+
 - Modify: `packages/recommender/src/v2-thumbs.ts`
 - Modify: `packages/recommender/tests/v2-thumbs.test.ts`
 
@@ -1053,6 +1069,7 @@ git commit -m "feat(recommender): computeGroupFitScore — asymmetric decay for 
 ### Task 9: Wire groupFit into `rankByThumbs`
 
 **Files:**
+
 - Modify: `packages/recommender/src/v2-thumbs.ts`
 - Modify: `packages/recommender/tests/v2-thumbs.test.ts`
 
@@ -1147,40 +1164,50 @@ export interface EnrichedGameForRanking {
 Find `RankInput`. Update the `weights` field:
 
 ```ts
-  weights: { thumbs: number; ownership: number; novelty: number; groupFit: number };
+weights: {
+  thumbs: number;
+  ownership: number;
+  novelty: number;
+  groupFit: number;
+}
 ```
 
 Find `RankResult`. Update the `breakdown` field:
 
 ```ts
-  picks: Array<{
-    gameId: string;
-    score: number;
-    breakdown: { thumbs: number; ownership: number; novelty: number; groupFit: number };
-    flags: GameFlag[];
-  }>;
-  weightsUsed: { thumbs: number; ownership: number; novelty: number; groupFit: number };
+picks: Array<{
+  gameId: string;
+  score: number;
+  breakdown: { thumbs: number; ownership: number; novelty: number; groupFit: number };
+  flags: GameFlag[];
+}>;
+weightsUsed: {
+  thumbs: number;
+  ownership: number;
+  novelty: number;
+  groupFit: number;
+}
 ```
 
 Find the inner loop in `rankByThumbs` where each candidate's `breakdown` is built. Add `groupFit` next to existing factors:
 
 ```ts
-    const groupFit = computeGroupFitScore({
-      groupSize: input.group.size,
-      optimalMin: c.optimalMin ?? null,
-      optimalMax: c.optimalMax ?? null,
-    });
-    const score =
-      input.weights.thumbs * thumbsScore +
-      input.weights.ownership * ownershipScore +
-      input.weights.novelty * noveltyScore +
-      input.weights.groupFit * groupFit;
-    picks.push({
-      gameId: c.id,
-      score,
-      breakdown: { thumbs: thumbsScore, ownership: ownershipScore, novelty: noveltyScore, groupFit },
-      flags,
-    });
+const groupFit = computeGroupFitScore({
+  groupSize: input.group.size,
+  optimalMin: c.optimalMin ?? null,
+  optimalMax: c.optimalMax ?? null,
+});
+const score =
+  input.weights.thumbs * thumbsScore +
+  input.weights.ownership * ownershipScore +
+  input.weights.novelty * noveltyScore +
+  input.weights.groupFit * groupFit;
+picks.push({
+  gameId: c.id,
+  score,
+  breakdown: { thumbs: thumbsScore, ownership: ownershipScore, novelty: noveltyScore, groupFit },
+  flags,
+});
 ```
 
 Update `weightsUsed` in the return statement:
@@ -1223,6 +1250,7 @@ git commit -m "feat(recommender): rankByThumbs adds groupFit factor (asymmetric 
 ### Task 10: Export `computeGroupFitScore` from package index
 
 **Files:**
+
 - Modify: `packages/recommender/src/index.ts`
 
 - [ ] **Step 1: Read the current index**
@@ -1281,6 +1309,7 @@ git commit -m "feat(recommender): export computeGroupFitScore + GroupFitScoreInp
 ### Task 11: `GET /api/games/:gameId?groupId=:gid` — game detail for the modal
 
 **Files:**
+
 - Create: `apps/worker/src/routes/games.ts`
 - Create: `apps/worker/tests/games-route.test.ts`
 - Modify: `apps/worker/src/index.ts`
@@ -1296,6 +1325,7 @@ Note the import + dispatch pattern (e.g., `dispatchLibrary`, `dispatchRecommenda
 - [ ] **Step 2: Write tests**
 
 `apps/worker/tests/games-route.test.ts`:
+
 ```ts
 // @ts-expect-error - cloudflare:test is provided by @cloudflare/vitest-pool-workers
 import { env } from 'cloudflare:test';
@@ -1351,23 +1381,19 @@ describe('GET /api/games/:gameId', () => {
   test('returns game + groupContext for a valid request', async () => {
     const { cookie, userId } = await signInAsTestUser(env);
     const gid = await createGroup(env, userId);
-    await env.DB
-      .prepare(
-        `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier, description, genres, has_coop, has_pvp, has_singleplayer)
+    await env.DB.prepare(
+      `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier, description, genres, has_coop, has_pvp, has_singleplayer)
          VALUES ('steam-730', 'CS2', 730, '2026-01-01', 'auto', 'Tactical shooter', '["Shooter"]', 0, 1, 0)`,
-      )
-      .run();
-    await env.DB
-      .prepare(
-        `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, last_played_at, added_at)
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, last_played_at, added_at)
          VALUES (?, 'steam-730', 'steam', 600, '2026-04-01T00:00:00Z', '2026-01-01T00:00:00Z')`,
-      )
+    )
       .bind(userId)
       .run();
-    await env.DB
-      .prepare(
-        `INSERT INTO thumbs (user_id, group_id, game_id, vote, voted_at) VALUES (?, ?, 'steam-730', 1, '2026-04-15T00:00:00Z')`,
-      )
+    await env.DB.prepare(
+      `INSERT INTO thumbs (user_id, group_id, game_id, vote, voted_at) VALUES (?, ?, 'steam-730', 1, '2026-04-15T00:00:00Z')`,
+    )
       .bind(userId, gid)
       .run();
     const res = await worker.fetch(
@@ -1498,7 +1524,7 @@ export async function dispatchGames(ctx: RouteCtx): Promise<Response | null> {
         ownerCount: members.length,
         groupSize: sizeRow.n,
         members,
-        yourVote: ((yourVoteRow?.vote ?? 0) as -1 | 0 | 1),
+        yourVote: (yourVoteRow?.vote ?? 0) as -1 | 0 | 1,
         thumbs: { up: thumbsAggRow.up ?? 0, down: thumbsAggRow.down ?? 0 },
         yourPlaytime: yourMember?.playtime ?? null,
         yourLastPlayed: yourMember?.lastPlayed ?? null,
@@ -1578,6 +1604,7 @@ git commit -m "feat(worker): GET /api/games/:gameId — detail + group context f
 ### Task 12: Library route — `?preset=` themed rows
 
 **Files:**
+
 - Modify: `apps/worker/src/routes/library.ts`
 - Modify: `apps/worker/tests/library-route.test.ts`
 
@@ -1598,26 +1625,20 @@ describe('GET /groups/:gid/library — ?preset=', () => {
     const gid = await createGroup(env, u1);
     await addMember(env, gid, u2);
     // Game A — owned by both, co-op, recent
-    await env.DB
-      .prepare(
-        `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier, has_coop, has_pvp, has_singleplayer, steam_review_pct_positive)
+    await env.DB.prepare(
+      `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier, has_coop, has_pvp, has_singleplayer, steam_review_pct_positive)
          VALUES ('steam-1', 'CoopRecent', 1, '2026-01-01', 'auto', 1, 0, 0, 90)`,
-      )
-      .run();
+    ).run();
     // Game B — owned by u1 only, pvp, old
-    await env.DB
-      .prepare(
-        `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier, has_coop, has_pvp, has_singleplayer, steam_review_pct_positive)
+    await env.DB.prepare(
+      `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier, has_coop, has_pvp, has_singleplayer, steam_review_pct_positive)
          VALUES ('steam-2', 'PvpOld', 2, '2026-01-01', 'auto', 0, 1, 0, 80)`,
-      )
-      .run();
+    ).run();
     // Game C — owned by both, single, low playtime, high reviews (hidden gem)
-    await env.DB
-      .prepare(
-        `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier, has_coop, has_pvp, has_singleplayer, steam_review_pct_positive)
+    await env.DB.prepare(
+      `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier, has_coop, has_pvp, has_singleplayer, steam_review_pct_positive)
          VALUES ('steam-3', 'GemSingle', 3, '2026-01-01', 'auto', 0, 0, 1, 95)`,
-      )
-      .run();
+    ).run();
     // Ownership
     for (const [user, gameId, playtime, lastPlayed] of [
       [u1, 'steam-1', 5000, '2026-04-30T00:00:00Z'],
@@ -1626,11 +1647,10 @@ describe('GET /groups/:gid/library — ?preset=', () => {
       [u1, 'steam-3', 50, '2025-06-01T00:00:00Z'],
       [u2, 'steam-3', 20, '2025-06-01T00:00:00Z'],
     ] as const) {
-      await env.DB
-        .prepare(
-          `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, last_played_at, added_at)
+      await env.DB.prepare(
+        `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, last_played_at, added_at)
            VALUES (?, ?, 'steam', ?, ?, '2025-01-01T00:00:00Z')`,
-        )
+      )
         .bind(user, gameId, playtime, lastPlayed)
         .run();
     }
@@ -1646,14 +1666,18 @@ describe('GET /groups/:gid/library — ?preset=', () => {
       env,
       {} as ExecutionContext,
     );
-    const body = (await res.json()) as { games: Array<{ game: { id: string }; ownerCount: number }> };
+    const body = (await res.json()) as {
+      games: Array<{ game: { id: string }; ownerCount: number }>;
+    };
     expect(body.games[0]!.ownerCount).toBeGreaterThanOrEqual(body.games[1]!.ownerCount);
   });
 
   test('preset=co-op returns only has_coop games', async () => {
     const { cookie, gid } = await seedGroup();
     const res = await worker.fetch(
-      new Request(`http://x/api/groups/${gid}/library?preset=co-op&limit=10`, { headers: { cookie } }),
+      new Request(`http://x/api/groups/${gid}/library?preset=co-op&limit=10`, {
+        headers: { cookie },
+      }),
       env,
       {} as ExecutionContext,
     );
@@ -1665,7 +1689,9 @@ describe('GET /groups/:gid/library — ?preset=', () => {
   test('preset=pvp returns only has_pvp games', async () => {
     const { cookie, gid } = await seedGroup();
     const res = await worker.fetch(
-      new Request(`http://x/api/groups/${gid}/library?preset=pvp&limit=10`, { headers: { cookie } }),
+      new Request(`http://x/api/groups/${gid}/library?preset=pvp&limit=10`, {
+        headers: { cookie },
+      }),
       env,
       {} as ExecutionContext,
     );
@@ -1677,7 +1703,9 @@ describe('GET /groups/:gid/library — ?preset=', () => {
   test('preset=recent orders by maxLastPlayed DESC', async () => {
     const { cookie, gid } = await seedGroup();
     const res = await worker.fetch(
-      new Request(`http://x/api/groups/${gid}/library?preset=recent&limit=10`, { headers: { cookie } }),
+      new Request(`http://x/api/groups/${gid}/library?preset=recent&limit=10`, {
+        headers: { cookie },
+      }),
       env,
       {} as ExecutionContext,
     );
@@ -1708,16 +1736,18 @@ NOTE: `createUser` and `addMember` helpers may need to be added to `tests/_helpe
 // in _helpers/auth.ts
 export async function createUser(env: Env, email: string, displayName: string): Promise<string> {
   const id = crypto.randomUUID();
-  await env.DB
-    .prepare('INSERT INTO users (id, email, display_name, created_at) VALUES (?, ?, ?, datetime())')
+  await env.DB.prepare(
+    'INSERT INTO users (id, email, display_name, created_at) VALUES (?, ?, ?, datetime())',
+  )
     .bind(id, email, displayName)
     .run();
   return id;
 }
 // in _helpers/groups.ts
 export async function addMember(env: Env, gid: string, userId: string): Promise<void> {
-  await env.DB
-    .prepare('INSERT INTO group_members (group_id, user_id, role, joined_at) VALUES (?, ?, "member", datetime())')
+  await env.DB.prepare(
+    'INSERT INTO group_members (group_id, user_id, role, joined_at) VALUES (?, ?, "member", datetime())',
+  )
     .bind(gid, userId)
     .run();
 }
@@ -1736,44 +1766,44 @@ Expected: 5 new preset tests fail (preset is ignored, returns full library).
 Find where `filter` and `sort` are read from `url.searchParams`. Add preset parsing above:
 
 ```ts
-  const preset = url.searchParams.get('preset');
-  let presetFilter: string | null = null;
-  let presetSort: string | null = null;
-  let presetExtraWhere: string | null = null;
-  let presetExtraBinds: unknown[] = [];
+const preset = url.searchParams.get('preset');
+let presetFilter: string | null = null;
+let presetSort: string | null = null;
+let presetExtraWhere: string | null = null;
+let presetExtraBinds: unknown[] = [];
 
-  if (preset) {
-    const playtimeThreshold = readNumber(env, 'WWP_HIDDEN_GEMS_PLAYTIME_THRESHOLD', 600);
-    if (preset === 'most-owned') {
-      presetSort = 'ownerCount DESC, g.name ASC';
-    } else if (preset === 'co-op') {
-      presetFilter = 'coop';
-      presetSort = 'ownerCount DESC, g.name ASC';
-    } else if (preset === 'pvp') {
-      presetFilter = 'pvp';
-      presetSort = 'ownerCount DESC, g.name ASC';
-    } else if (preset === 'recent') {
-      presetSort = 'maxLastPlayed DESC';
-    } else if (preset === 'hidden-gems') {
-      // Aggregate playtime per game across the group, low total + high reviews.
-      presetExtraWhere = `AND g.steam_review_pct_positive >= 75 AND (
+if (preset) {
+  const playtimeThreshold = readNumber(env, 'WWP_HIDDEN_GEMS_PLAYTIME_THRESHOLD', 600);
+  if (preset === 'most-owned') {
+    presetSort = 'ownerCount DESC, g.name ASC';
+  } else if (preset === 'co-op') {
+    presetFilter = 'coop';
+    presetSort = 'ownerCount DESC, g.name ASC';
+  } else if (preset === 'pvp') {
+    presetFilter = 'pvp';
+    presetSort = 'ownerCount DESC, g.name ASC';
+  } else if (preset === 'recent') {
+    presetSort = 'maxLastPlayed DESC';
+  } else if (preset === 'hidden-gems') {
+    // Aggregate playtime per game across the group, low total + high reviews.
+    presetExtraWhere = `AND g.steam_review_pct_positive >= 75 AND (
         SELECT COALESCE(SUM(playtime_minutes), 0)
           FROM game_ownership go3
           JOIN group_members gm3 ON gm3.user_id = go3.user_id
          WHERE go3.game_id = g.id AND gm3.group_id = ?
       ) <= ?`;
-      presetExtraBinds = [gid, playtimeThreshold];
-      presetSort = 'g.steam_review_pct_positive DESC';
-    }
+    presetExtraBinds = [gid, playtimeThreshold];
+    presetSort = 'g.steam_review_pct_positive DESC';
   }
+}
 ```
 
 Replace the old filter/sort lookup with preset-aware versions:
 
 ```ts
-  const effectiveFilter = presetFilter ?? filter;
-  const effectiveSort = presetSort ?? sortMap[sort] ?? sortMap.name;
-  // ... build filterClauses based on effectiveFilter
+const effectiveFilter = presetFilter ?? filter;
+const effectiveSort = presetSort ?? sortMap[sort] ?? sortMap.name;
+// ... build filterClauses based on effectiveFilter
 ```
 
 When binding the SELECT, include `presetExtraBinds` between the existing bind set and limit/offset (following the placement of `presetExtraWhere` in the SQL string).
@@ -1805,6 +1835,7 @@ git commit -m "feat(worker): library ?preset= — most-owned, co-op, pvp, recent
 ### Task 13: Recommendations route — pass `optimalMin`/`optimalMax` and `groupFit` weight
 
 **Files:**
+
 - Modify: `apps/worker/src/routes/recommendations.ts`
 - Modify: `apps/worker/tests/recommendations-route.test.ts`
 
@@ -1820,19 +1851,16 @@ test('groupFit factor surfaces well-fit games above poor-fit ones', async () => 
   const gid = await createGroup(env, userId);
   await addMember(env, gid, u2);
   await addMember(env, gid, u3);
-  await env.DB
-    .prepare(
-      `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier, has_coop, optimal_min, optimal_max, steam_review_pct_positive)
+  await env.DB.prepare(
+    `INSERT INTO games (id, name, steam_app_id, metadata_synced_at, catalog_tier, has_coop, optimal_min, optimal_max, steam_review_pct_positive)
        VALUES ('steam-fit', 'GoodFit', 1, '2026-01-01', 'auto', 1, 2, 4, 90),
               ('steam-misfit', 'PoorFit', 2, '2026-01-01', 'auto', 1, 1, 1, 90)`,
-    )
-    .run();
+  ).run();
   for (const u of [userId, u2, u3]) {
-    await env.DB
-      .prepare(
-        `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, last_played_at, added_at)
+    await env.DB.prepare(
+      `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, last_played_at, added_at)
            SELECT ?, id, 'steam', 0, NULL, '2026-01-01' FROM games`,
-      )
+    )
       .bind(u)
       .run();
   }
@@ -1841,7 +1869,9 @@ test('groupFit factor surfaces well-fit games above poor-fit ones', async () => 
     env,
     {} as ExecutionContext,
   );
-  const body = (await res.json()) as { picks: Array<{ game: { id: string }; score: number; breakdown: any }> };
+  const body = (await res.json()) as {
+    picks: Array<{ game: { id: string }; score: number; breakdown: any }>;
+  };
   const fit = body.picks.find((p) => p.game.id === 'steam-fit')!;
   const misfit = body.picks.find((p) => p.game.id === 'steam-misfit')!;
   expect(fit.breakdown.groupFit).toBeCloseTo(1.0);
@@ -1863,25 +1893,25 @@ Expected: `breakdown.groupFit` is undefined.
 Update the `weights` block:
 
 ```ts
-  const weights = {
-    thumbs: readNumber(env, 'WWP_WEIGHT_THUMBS', 0.4),
-    ownership: readNumber(env, 'WWP_WEIGHT_OWNERSHIP', 0.2),
-    novelty: readNumber(env, 'WWP_WEIGHT_NOVELTY', 0.2),
-    groupFit: readNumber(env, 'WWP_WEIGHT_GROUPFIT', 0.2),
-  };
+const weights = {
+  thumbs: readNumber(env, 'WWP_WEIGHT_THUMBS', 0.4),
+  ownership: readNumber(env, 'WWP_WEIGHT_OWNERSHIP', 0.2),
+  novelty: readNumber(env, 'WWP_WEIGHT_NOVELTY', 0.2),
+  groupFit: readNumber(env, 'WWP_WEIGHT_GROUPFIT', 0.2),
+};
 ```
 
 Update the `candidates` projection to include `optimalMin`/`optimalMax`:
 
 ```ts
-  const candidates = (candidatesResult.results as Record<string, unknown>[]).map((r) => ({
-    id: r.id as string,
-    name: r.name as string,
-    steamReviewPctPositive: (r.steam_review_pct_positive as number | null) ?? null,
-    metadataSyncedAt: (r.metadata_synced_at as string | null) ?? null,
-    optimalMin: (r.optimal_min as number | null) ?? null,
-    optimalMax: (r.optimal_max as number | null) ?? null,
-  }));
+const candidates = (candidatesResult.results as Record<string, unknown>[]).map((r) => ({
+  id: r.id as string,
+  name: r.name as string,
+  steamReviewPctPositive: (r.steam_review_pct_positive as number | null) ?? null,
+  metadataSyncedAt: (r.metadata_synced_at as string | null) ?? null,
+  optimalMin: (r.optimal_min as number | null) ?? null,
+  optimalMax: (r.optimal_max as number | null) ?? null,
+}));
 ```
 
 `rankByThumbs` already returns `breakdown.groupFit` after Task 9 — no other changes needed in this file. The `breakdown` field passes through transparently to the API response.
@@ -1909,6 +1939,7 @@ git commit -m "feat(worker): recommendations passes optimalMin/Max + groupFit we
 ### Task 14: Add new icons
 
 **Files:**
+
 - Modify: `apps/site/src/components/icons.tsx`
 
 - [ ] **Step 1: Read current icons file**
@@ -1968,7 +1999,19 @@ export function SettingsIcon({ className }: { className?: string }) {
 
 export function ChevronRightIcon({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
       <path d="m9 18 6-6-6-6" />
     </svg>
   );
@@ -1976,7 +2019,19 @@ export function ChevronRightIcon({ className }: { className?: string }) {
 
 export function ChevronLeftIcon({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
       <path d="m15 18-6-6 6-6" />
     </svg>
   );
@@ -1984,7 +2039,19 @@ export function ChevronLeftIcon({ className }: { className?: string }) {
 
 export function CloseIcon({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
     </svg>
@@ -2010,6 +2077,7 @@ git commit -m "feat(site): add SearchIcon, SettingsIcon, ChevronLeft/RightIcon, 
 ### Task 15: GameCard component variants
 
 **Files:**
+
 - Modify: `apps/site/src/components/GameCard.tsx`
 
 - [ ] **Step 1: Read the current GameCard**
@@ -2019,6 +2087,7 @@ cat apps/site/src/components/GameCard.tsx
 ```
 
 Current implementation displays a single horizontal card with name + cover + thumbs. v2.2 needs two variants:
+
 - **default** — used in modals / detailed lists (existing)
 - **compact** — fixed-width tile for horizontal-scrolling rows (~160px wide, name overlay on cover, no thumbs UI)
 
@@ -2043,7 +2112,15 @@ interface GameCardProps {
   ownerCount?: number;
 }
 
-export function GameCard({ game, variant = 'default', onClick, yourVote, thumbsUp, thumbsDown, ownerCount }: GameCardProps) {
+export function GameCard({
+  game,
+  variant = 'default',
+  onClick,
+  yourVote,
+  thumbsUp,
+  thumbsDown,
+  ownerCount,
+}: GameCardProps) {
   if (variant === 'compact') {
     return (
       <button
@@ -2053,7 +2130,12 @@ export function GameCard({ game, variant = 'default', onClick, yourVote, thumbsU
         aria-label={`Open ${game.name}`}
       >
         {game.coverUrl ? (
-          <img src={game.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-105" loading="lazy" />
+          <img
+            src={game.coverUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-105"
+            loading="lazy"
+          />
         ) : (
           <div className="absolute inset-0 bg-bg" />
         )}
@@ -2099,6 +2181,7 @@ git commit -m "feat(site): GameCard adds compact variant for Netflix-style row t
 ### Task 16: RowSection — horizontally scrolling row of GameCards
 
 **Files:**
+
 - Create: `apps/site/src/components/RowSection.tsx`
 
 - [ ] **Step 1: Implement RowSection**
@@ -2238,6 +2321,7 @@ git commit -m "feat(site): RowSection — horizontally scrolling row of compact 
 ### Task 17: HeroCard — full-bleed top of group page
 
 **Files:**
+
 - Create: `apps/site/src/components/HeroCard.tsx`
 
 - [ ] **Step 1: Implement HeroCard**
@@ -2270,7 +2354,9 @@ export function HeroCard({ pick, onSelect }: HeroCardProps) {
     return (
       <div className="relative h-[60vh] min-h-[360px] w-full overflow-hidden rounded bg-panel">
         <div className="flex h-full items-center justify-center">
-          <p className="text-muted">No recommendations yet — sync your Steam library to get started.</p>
+          <p className="text-muted">
+            No recommendations yet — sync your Steam library to get started.
+          </p>
         </div>
       </div>
     );
@@ -2296,7 +2382,9 @@ export function HeroCard({ pick, onSelect }: HeroCardProps) {
             Owned by {pick.ownerCount}/{pick.groupSize}
           </span>
           {pick.thumbs.up > 0 && <span>{pick.thumbs.up} thumbs up</span>}
-          {pick.game.genres && pick.game.genres.length > 0 && <span>{pick.game.genres.slice(0, 3).join(' · ')}</span>}
+          {pick.game.genres && pick.game.genres.length > 0 && (
+            <span>{pick.game.genres.slice(0, 3).join(' · ')}</span>
+          )}
         </div>
         <div>
           <button
@@ -2326,6 +2414,7 @@ git commit -m "feat(site): HeroCard — full-bleed top pick with IGDB backdrop"
 ### Task 18: GameDetailModal
 
 **Files:**
+
 - Create: `apps/site/src/components/GameDetailModal.tsx`
 
 - [ ] **Step 1: Implement GameDetailModal**
@@ -2356,9 +2445,7 @@ export function GameDetailModal({ gameId, groupId, onClose }: GameDetailModalPro
     let alive = true;
     (async () => {
       try {
-        const r = await api.get<GameDetailResponse>(
-          `/api/games/${gameId}?groupId=${groupId}`,
-        );
+        const r = await api.get<GameDetailResponse>(`/api/games/${gameId}?groupId=${groupId}`);
         if (alive) setData(r);
       } catch (e) {
         if (alive) setError((e as Error).message);
@@ -2387,9 +2474,7 @@ export function GameDetailModal({ gameId, groupId, onClose }: GameDetailModalPro
         vote: newVote,
       });
       // Optimistic refetch
-      const r = await api.get<GameDetailResponse>(
-        `/api/games/${data.game.id}?groupId=${groupId}`,
-      );
+      const r = await api.get<GameDetailResponse>(`/api/games/${data.game.id}?groupId=${groupId}`);
       setData(r);
     } catch (e) {
       setError((e as Error).message);
@@ -2402,7 +2487,7 @@ export function GameDetailModal({ gameId, groupId, onClose }: GameDetailModalPro
 
   const backdrop = data?.game.igdbScreenshotId
     ? `${IGDB_HERO_BASE}/${data.game.igdbScreenshotId}.jpg`
-    : data?.game.coverUrl ?? null;
+    : (data?.game.coverUrl ?? null);
 
   return (
     <div
@@ -2425,14 +2510,16 @@ export function GameDetailModal({ gameId, groupId, onClose }: GameDetailModalPro
         </button>
 
         {!data && !error && <div className="p-8 text-center text-muted">Loading…</div>}
-        {error && (
-          <div className="p-8 text-center text-danger">Failed to load: {error}</div>
-        )}
+        {error && <div className="p-8 text-center text-danger">Failed to load: {error}</div>}
         {data && (
           <>
             <div className="relative h-64 w-full overflow-hidden">
               {backdrop ? (
-                <img src={backdrop} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                <img
+                  src={backdrop}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
               ) : (
                 <div className="absolute inset-0 bg-bg" />
               )}
@@ -2476,7 +2563,8 @@ export function GameDetailModal({ gameId, groupId, onClose }: GameDetailModalPro
                       : 'border-border text-muted hover:text-text'
                   }`}
                 >
-                  <ThumbUpIcon /> <span className="ml-1 text-xs">{data.groupContext.thumbs.up}</span>
+                  <ThumbUpIcon />{' '}
+                  <span className="ml-1 text-xs">{data.groupContext.thumbs.up}</span>
                 </button>
                 <button
                   type="button"
@@ -2489,7 +2577,8 @@ export function GameDetailModal({ gameId, groupId, onClose }: GameDetailModalPro
                       : 'border-border text-muted hover:text-text'
                   }`}
                 >
-                  <ThumbDownIcon /> <span className="ml-1 text-xs">{data.groupContext.thumbs.down}</span>
+                  <ThumbDownIcon />{' '}
+                  <span className="ml-1 text-xs">{data.groupContext.thumbs.down}</span>
                 </button>
               </div>
 
@@ -2498,7 +2587,10 @@ export function GameDetailModal({ gameId, groupId, onClose }: GameDetailModalPro
                   <h3 className="mb-2 text-sm font-semibold">Who owns it</h3>
                   <ul className="space-y-1 text-xs">
                     {data.groupContext.members.map((m) => (
-                      <li key={m.userId} className="flex items-center justify-between gap-2 rounded bg-bg p-2">
+                      <li
+                        key={m.userId}
+                        className="flex items-center justify-between gap-2 rounded bg-bg p-2"
+                      >
                         <span className="flex items-center gap-2">
                           {m.avatarUrl ? (
                             <img src={m.avatarUrl} alt="" className="h-5 w-5 rounded-full" />
@@ -2552,6 +2644,7 @@ git commit -m "feat(site): GameDetailModal — IGDB backdrop, member ownership, 
 ### Task 19: SearchOverlay — top-bar trigger + full-screen overlay
 
 **Files:**
+
 - Create: `apps/site/src/components/SearchOverlay.tsx`
 
 - [ ] **Step 1: Implement SearchOverlay**
@@ -2565,7 +2658,10 @@ interface LibraryItem {
   game: { id: string; name: string; coverUrl?: string | null };
   ownerCount: number;
 }
-interface LibraryResponse { games: LibraryItem[]; total: number; }
+interface LibraryResponse {
+  games: LibraryItem[];
+  total: number;
+}
 
 interface SearchOverlayProps {
   groupId: string;
@@ -2633,10 +2729,7 @@ export function SearchOverlay({ groupId, onSelect }: SearchOverlayProps) {
           role="dialog"
           aria-modal="true"
         >
-          <div
-            className="mx-auto mt-12 max-w-3xl px-4"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="mx-auto mt-12 max-w-3xl px-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 rounded border border-border bg-panel p-3">
               <SearchIcon className="h-4 w-4 text-muted" />
               <input
@@ -2673,7 +2766,11 @@ export function SearchOverlay({ groupId, onSelect }: SearchOverlayProps) {
                   className="flex w-full items-center gap-3 rounded border border-transparent p-2 text-left hover:border-border hover:bg-panel"
                 >
                   {it.game.coverUrl ? (
-                    <img src={it.game.coverUrl} alt="" className="h-10 w-16 shrink-0 rounded object-cover" />
+                    <img
+                      src={it.game.coverUrl}
+                      alt=""
+                      className="h-10 w-16 shrink-0 rounded object-cover"
+                    />
                   ) : (
                     <div className="h-10 w-16 shrink-0 rounded bg-panel" />
                   )}
@@ -2707,6 +2804,7 @@ git commit -m "feat(site): SearchOverlay — top-bar trigger + full-screen libra
 ### Task 20: GroupHomePage rewrite
 
 **Files:**
+
 - Create: `apps/site/src/components/GroupHomePage.tsx`
 - Modify: `apps/site/src/pages/groups/[gid].astro`
 
@@ -2723,6 +2821,7 @@ For v2.2 we just replace it cleanly.
 - [ ] **Step 2: Implement GroupHomePage**
 
 `apps/site/src/components/GroupHomePage.tsx`:
+
 ```tsx
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api-client.js';
@@ -2804,11 +2903,26 @@ export default function GroupHomePage({ groupId }: GroupHomePageProps) {
       <HeroCard pick={hero} onSelect={() => hero && setModalGameId(hero.game.id)} />
 
       <div className="space-y-6">
-        <RowSection title="Most owned" groupId={groupId} preset="most-owned" onCardClick={setModalGameId} />
+        <RowSection
+          title="Most owned"
+          groupId={groupId}
+          preset="most-owned"
+          onCardClick={setModalGameId}
+        />
         <RowSection title="Co-op" groupId={groupId} preset="co-op" onCardClick={setModalGameId} />
         <RowSection title="PvP" groupId={groupId} preset="pvp" onCardClick={setModalGameId} />
-        <RowSection title="Recently played" groupId={groupId} preset="recent" onCardClick={setModalGameId} />
-        <RowSection title="Hidden gems" groupId={groupId} preset="hidden-gems" onCardClick={setModalGameId} />
+        <RowSection
+          title="Recently played"
+          groupId={groupId}
+          preset="recent"
+          onCardClick={setModalGameId}
+        />
+        <RowSection
+          title="Hidden gems"
+          groupId={groupId}
+          preset="hidden-gems"
+          onCardClick={setModalGameId}
+        />
       </div>
 
       <GameDetailModal
@@ -2861,6 +2975,7 @@ git commit -m "feat(site): Netflix group home — hero + 6 rows + search + setti
 ### Task 21: GroupSettings page (Members + Invites + Leave consolidated)
 
 **Files:**
+
 - Create: `apps/site/src/components/GroupSettings.tsx`
 - Create: `apps/site/src/pages/groups/[gid]/settings.astro`
 
@@ -2875,6 +2990,7 @@ The Members panel, Invites panel, and Leave button live in `GroupHomeMinimal`. v
 - [ ] **Step 2: Implement GroupSettings**
 
 `apps/site/src/components/GroupSettings.tsx`:
+
 ```tsx
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api-client.js';
@@ -2882,8 +2998,19 @@ import { ArrowLeftIcon } from './icons.js';
 
 interface GroupResponse {
   group: { id: string; name: string; createdAt: string };
-  members: Array<{ userId: string; displayName: string; avatarUrl: string | null; role: 'owner' | 'member' }>;
-  invites: Array<{ id: string; code: string; createdAt: string; expiresAt: string | null; usesRemaining: number | null }>;
+  members: Array<{
+    userId: string;
+    displayName: string;
+    avatarUrl: string | null;
+    role: 'owner' | 'member';
+  }>;
+  invites: Array<{
+    id: string;
+    code: string;
+    createdAt: string;
+    expiresAt: string | null;
+    usesRemaining: number | null;
+  }>;
   yourRole: 'owner' | 'member';
 }
 
@@ -3056,6 +3183,7 @@ NOTE: confirm `GET /api/groups/:gid`, `POST /api/groups/:gid/invites`, `DELETE /
 - [ ] **Step 3: Create the page route**
 
 `apps/site/src/pages/groups/[gid]/settings.astro`:
+
 ```astro
 ---
 import Layout from '../../../layouts/Layout.astro';
@@ -3092,6 +3220,7 @@ git commit -m "feat(site): /groups/:gid/settings — members + invites + leave c
 ### Task 22: Remove obsolete `GroupHomeMinimal.tsx`
 
 **Files:**
+
 - Delete: `apps/site/src/components/GroupHomeMinimal.tsx`
 - Delete: `apps/site/src/components/WhosPlayingMinimal.tsx` (only if entirely subsumed by HeroCard + GameDetailModal — verify it's not referenced elsewhere)
 
@@ -3133,6 +3262,7 @@ git commit -m "chore(site): remove v2.1 GroupHomeMinimal/WhosPlayingMinimal (rep
 ### Task 23: CI deploy-worker step injects IGDB credentials
 
 **Files:**
+
 - Modify: `.github/workflows/deploy.yml` (or whichever workflow file invokes `wrangler deploy` for the worker)
 
 - [ ] **Step 1: Locate the worker deploy step**
@@ -3162,15 +3292,15 @@ In the workflow file, the existing step likely looks like:
 Append two more lines for IGDB:
 
 ```yaml
-    echo "$IGDB_CLIENT_ID" | npx wrangler secret put IGDB_CLIENT_ID --name wwp-worker
-    echo "$IGDB_CLIENT_SECRET" | npx wrangler secret put IGDB_CLIENT_SECRET --name wwp-worker
+echo "$IGDB_CLIENT_ID" | npx wrangler secret put IGDB_CLIENT_ID --name wwp-worker
+echo "$IGDB_CLIENT_SECRET" | npx wrangler secret put IGDB_CLIENT_SECRET --name wwp-worker
 ```
 
 And add to the `env:` block:
 
 ```yaml
-    IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
-    IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
+IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
 ```
 
 - [ ] **Step 3: Commit**
@@ -3229,6 +3359,7 @@ Expected: no `IGDB_CLIENT_ID / IGDB_CLIENT_SECRET not configured` errors. Look f
 - [ ] **Step 5: Smoke test the new UI**
 
 Navigate to a group page on production. Verify:
+
 - Hero loads with backdrop image
 - All 6 rows render (some may be empty if library is small)
 - Clicking a card opens the modal with description
@@ -3271,6 +3402,7 @@ EOF
 - [ ] **Step 8: Save project memory**
 
 After merge, update memory file `crime-rpg-v2.md` (or wherever WhatWePlayin context lives) with:
+
 - "v2.2 shipped" + date
 - Note that `WWP_FEAT_IGDB` is the kill-switch
 - Note that recommender now has 4 factors (was 3)

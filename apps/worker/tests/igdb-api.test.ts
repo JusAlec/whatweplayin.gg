@@ -1,7 +1,7 @@
 import { test, expect, describe, beforeEach, vi } from 'vitest';
 // @ts-expect-error - cloudflare:test is provided by @cloudflare/vitest-pool-workers
 import { env } from 'cloudflare:test';
-import { getIGDBToken, fetchIGDBGameByAppId, type IGDBGame } from '../src/lib/igdb-api.js';
+import { getIGDBToken, fetchIGDBGameByAppId } from '../src/lib/igdb-api.js';
 
 beforeEach(async () => {
   env.IGDB_CLIENT_ID = 'test-client-id';

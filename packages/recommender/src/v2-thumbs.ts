@@ -160,7 +160,12 @@ export function rankByThumbs(input: RankInput): RankResult {
     picks.push({
       gameId: game.id,
       score,
-      breakdown: { thumbs: thumbsScore, ownership: ownershipScore, novelty: noveltyScore, groupFit },
+      breakdown: {
+        thumbs: thumbsScore,
+        ownership: ownershipScore,
+        novelty: noveltyScore,
+        groupFit,
+      },
       flags,
       steamPct: game.steamReviewPctPositive,
       name: game.name,

@@ -29,15 +29,15 @@ WhatWePlayin gates behavior behind feature flags read from `apps/worker/wrangler
 | `WWP_WEIGHT_NOVELTY`           | number | `"0.2"`  | `readNumber` | recommender weight on the novelty (recency-decay) axis                                                                          | (n/a)                                                             |                                                                                  |
 | `WWP_RECOMMENDATIONS_LIMIT`    | number | `"5"`    | `readNumber` | how many picks the recommender returns                                                                                          | (n/a)                                                             | UI's "Recommended tonight" row scrolls horizontally if > 5                       |
 | `WWP_THUMBS_DOWN_VETO_DAYS`    | number | `"7"`    | `readNumber` | days a thumb-down filters a game out of recommendations for the group                                                           | (n/a)                                                             | After veto expires, the game can return to the candidate pool                    |
-| `WWP_ENRICHMENT_MAX_PER_RUN`   | number | `"13"`   | `readNumber` | max games enrichOne processes per sync run (Steam Store + IGDB)                                                                  | (n/a)                                                             | Lower = slower sync, fresher data. Higher = faster but risks rate-limiting.      |
+| `WWP_ENRICHMENT_MAX_PER_RUN`   | number | `"13"`   | `readNumber` | max games enrichOne processes per sync run (Steam Store + IGDB)                                                                 | (n/a)                                                             | Lower = slower sync, fresher data. Higher = faster but risks rate-limiting.      |
 
 ## v2.2 flags
 
-| Flag | Type | Default | Helper | When ON / set | When OFF / unset | Notes |
-|---|---|---|---|---|---|---|
-| `WWP_FEAT_IGDB` | bool | `"true"` | `flagOn` | enrichOne calls IGDB games endpoint after Steam Store; populates description/genres/igdb_screenshot_id/optimal_min/max | IGDB step skipped; sync stays Steam-only | Flip to `"false"` if IGDB has an outage |
-| `WWP_WEIGHT_GROUPFIT` | number | `"0.2"` | `readNumber` | recommender weight on the groupFit axis (player-count-fit) | (n/a) | Defaults sum to 1.0 with rebalanced thumbs/ownership |
-| `WWP_HIDDEN_GEMS_PLAYTIME_THRESHOLD` | number | `"600"` | `readNumber` | playtime ceiling (minutes) for the hidden-gems library preset; games with total group playtime ≤ this AND review pct ≥ 75 qualify | (n/a) | Increase if hidden-gems row is sparse |
+| Flag                                 | Type   | Default  | Helper       | When ON / set                                                                                                                     | When OFF / unset                         | Notes                                                |
+| ------------------------------------ | ------ | -------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ---------------------------------------------------- |
+| `WWP_FEAT_IGDB`                      | bool   | `"true"` | `flagOn`     | enrichOne calls IGDB games endpoint after Steam Store; populates description/genres/igdb_screenshot_id/optimal_min/max            | IGDB step skipped; sync stays Steam-only | Flip to `"false"` if IGDB has an outage              |
+| `WWP_WEIGHT_GROUPFIT`                | number | `"0.2"`  | `readNumber` | recommender weight on the groupFit axis (player-count-fit)                                                                        | (n/a)                                    | Defaults sum to 1.0 with rebalanced thumbs/ownership |
+| `WWP_HIDDEN_GEMS_PLAYTIME_THRESHOLD` | number | `"600"`  | `readNumber` | playtime ceiling (minutes) for the hidden-gems library preset; games with total group playtime ≤ this AND review pct ≥ 75 qualify | (n/a)                                    | Increase if hidden-gems row is sparse                |
 
 ## Adding a new flag
 
