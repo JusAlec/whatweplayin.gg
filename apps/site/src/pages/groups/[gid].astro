@@ -1,11 +1,13 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import GroupHomeMinimal from '../../components/GroupHomeMinimal.tsx';
+import GroupHomePage from '../../components/GroupHomePage.tsx';
 
 export const prerender = false;
 
 const { gid } = Astro.params;
 ---
 <Layout title="Group — WhatWePlayin">
-  <GroupHomeMinimal client:load gid={gid!} />
+  <main class="mx-auto max-w-6xl p-4">
+    <GroupHomePage client:load groupId={gid!} />
+  </main>
 </Layout>
