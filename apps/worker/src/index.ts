@@ -38,6 +38,13 @@ export interface Env {
   WWP_RECOMMENDATIONS_LIMIT?: string;
   WWP_THUMBS_DOWN_VETO_DAYS?: string;
   WWP_ENRICHMENT_MAX_PER_RUN?: string;
+
+  // v2.2 behavior toggles
+  WWP_FEAT_IGDB?: string;
+
+  // v2.2 tunables
+  WWP_WEIGHT_GROUPFIT?: string;
+  WWP_HIDDEN_GEMS_PLAYTIME_THRESHOLD?: string;
 }
 
 export default {
