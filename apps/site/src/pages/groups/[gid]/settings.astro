@@ -1,0 +1,13 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import GroupSettings from '../../../components/GroupSettings.tsx';
+
+export const prerender = false;
+
+const { gid } = Astro.params;
+---
+<Layout title="Group settings — WhatWePlayin">
+  <main class="mx-auto max-w-3xl p-4">
+    <GroupSettings client:load groupId={gid!} />
+  </main>
+</Layout>
