@@ -13,10 +13,12 @@ export {
   computeThumbsScore,
   computeOwnershipScore,
   computeNoveltyScore,
+  computeGroupFitScore,
 } from './v2-thumbs.js';
 export type {
   RankInput,
   RankResult,
   EnrichedGameForRanking,
   GameFlag as GameFlagV21,
+  GroupFitScoreInput,
 } from './v2-thumbs.js';
