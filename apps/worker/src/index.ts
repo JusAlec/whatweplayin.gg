@@ -10,6 +10,7 @@ import { dispatchState } from './routes/state.js';
 import { dispatchThumbs } from './routes/thumbs.js';
 import { dispatchLibrary } from './routes/library.js';
 import { dispatchRecommendations } from './routes/recommendations.js';
+import { dispatchGames } from './routes/games.js';
 import { checkAuth as checkGroupSecret } from './auth.js';
 
 export interface Env {
@@ -87,6 +88,8 @@ export default {
         parts: apiParts,
       });
       if (recommendationsResp) return withCors(recommendationsResp, request, env);
+      const gamesResp = await dispatchGames({ request, env, parts: apiParts });
+      if (gamesResp) return withCors(gamesResp, request, env);
       return withCors(new Response('not found', { status: 404 }), request, env);
     }
 
