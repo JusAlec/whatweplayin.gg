@@ -11,7 +11,7 @@ Live at [whatweplayin.gg](https://whatweplayin.gg).
 - **Auth:** Steam OpenID + magic-link email (Resend) + OAuth account linking
 - **Recommender:** pure-function package at `packages/recommender/` (4 factors: thumbs, ownership, novelty, groupFit)
 - **Tests:** [Vitest](https://vitest.dev/) for unit + worker (miniflare via `@cloudflare/vitest-pool-workers`); [Playwright](https://playwright.dev/) for site e2e
-- **Build:** pnpm 9 workspaces; Node 20
+- **Build:** pnpm 9 workspaces; Node 22 (Wrangler v4 requires ≥22)
 
 ## Repo layout
 
@@ -34,7 +34,7 @@ docs/
 ## Setup
 
 ```bash
-nvm use                   # uses .nvmrc → Node 20
+nvm use                   # uses .nvmrc → Node 22
 corepack enable           # pins pnpm@9.15.4 from package.json#packageManager
 pnpm install
 pnpm dev                  # site at http://localhost:4321 (Astro)
