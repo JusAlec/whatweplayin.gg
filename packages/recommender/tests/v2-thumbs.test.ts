@@ -3,7 +3,9 @@ import {
   computeThumbsScore,
   computeOwnershipScore,
   computeNoveltyScore,
+  computeGroupFitScore,
   rankByThumbs,
+  type EnrichedGameForRanking,
 } from '../src/v2-thumbs.js';
 
 describe('computeThumbsScore', () => {
@@ -145,7 +147,7 @@ describe('computeNoveltyScore', () => {
 
 describe('rankByThumbs', () => {
   const NOW = new Date('2026-05-04T00:00:00Z');
-  const WEIGHTS = { thumbs: 0.5, ownership: 0.3, novelty: 0.2 };
+  const WEIGHTS = { thumbs: 0.5, ownership: 0.3, novelty: 0.2, groupFit: 0 };
 
   test('ranks games by composite score (descending)', () => {
     const result = rankByThumbs({
@@ -306,9 +308,96 @@ describe('rankByThumbs', () => {
       candidates: [],
       thumbs: new Map(),
       ownership: new Map(),
-      weights: { thumbs: 0.6, ownership: 0.2, novelty: 0.2 },
+      weights: { thumbs: 0.6, ownership: 0.2, novelty: 0.2, groupFit: 0 },
       now: NOW,
     });
-    expect(result.weightsUsed).toEqual({ thumbs: 0.6, ownership: 0.2, novelty: 0.2 });
+    expect(result.weightsUsed).toEqual({ thumbs: 0.6, ownership: 0.2, novelty: 0.2, groupFit: 0 });
+  });
+});
+
+describe('computeGroupFitScore', () => {
+  test('returns 1.0 inside the optimal range', () => {
+    expect(computeGroupFitScore({ groupSize: 4, optimalMin: 2, optimalMax: 6 })).toBeCloseTo(1.0);
+    expect(computeGroupFitScore({ groupSize: 2, optimalMin: 2, optimalMax: 6 })).toBeCloseTo(1.0);
+    expect(computeGroupFitScore({ groupSize: 6, optimalMin: 2, optimalMax: 6 })).toBeCloseTo(1.0);
+  });
+
+  test('decays at -0.25 per step below the range, floors at 0', () => {
+    expect(computeGroupFitScore({ groupSize: 1, optimalMin: 2, optimalMax: 6 })).toBeCloseTo(0.75);
+    expect(computeGroupFitScore({ groupSize: 1, optimalMin: 4, optimalMax: 6 })).toBeCloseTo(0.25);
+    expect(computeGroupFitScore({ groupSize: 1, optimalMin: 8, optimalMax: 10 })).toBe(0); // floored
+  });
+
+  test('decays at -0.15 per step above the range, floors at 0', () => {
+    expect(computeGroupFitScore({ groupSize: 7, optimalMin: 2, optimalMax: 6 })).toBeCloseTo(0.85);
+    expect(computeGroupFitScore({ groupSize: 8, optimalMin: 2, optimalMax: 6 })).toBeCloseTo(0.7);
+    expect(computeGroupFitScore({ groupSize: 20, optimalMin: 2, optimalMax: 6 })).toBe(0);
+  });
+
+  test('returns 0.5 when optimal range is missing (neutral fallback)', () => {
+    expect(computeGroupFitScore({ groupSize: 4, optimalMin: null, optimalMax: null })).toBe(0.5);
+    expect(computeGroupFitScore({ groupSize: 4, optimalMin: 2, optimalMax: null })).toBe(0.5);
+    expect(computeGroupFitScore({ groupSize: 4, optimalMin: null, optimalMax: 6 })).toBe(0.5);
+  });
+});
+
+describe('rankByThumbs — groupFit factor', () => {
+  test('groupFit raises score for games matching group size', () => {
+    const candidates: EnrichedGameForRanking[] = [
+      {
+        id: 'good-fit',
+        name: 'Good Fit',
+        steamReviewPctPositive: 80,
+        metadataSyncedAt: new Date().toISOString(),
+        optimalMin: 4,
+        optimalMax: 6,
+      },
+      {
+        id: 'bad-fit',
+        name: 'Bad Fit',
+        steamReviewPctPositive: 80,
+        metadataSyncedAt: new Date().toISOString(),
+        optimalMin: 1,
+        optimalMax: 1,
+      },
+    ];
+    const result = rankByThumbs({
+      group: { id: 'g1', size: 4 },
+      candidates,
+      thumbs: new Map(),
+      ownership: new Map([
+        ['good-fit', { ownerCount: 4, maxLastPlayed: null }],
+        ['bad-fit', { ownerCount: 4, maxLastPlayed: null }],
+      ]),
+      weights: { thumbs: 0.4, ownership: 0.2, novelty: 0.2, groupFit: 0.2 },
+      now: new Date(),
+    });
+    const goodPick = result.picks.find((p) => p.gameId === 'good-fit')!;
+    const badPick = result.picks.find((p) => p.gameId === 'bad-fit')!;
+    expect(goodPick.breakdown.groupFit).toBeCloseTo(1.0);
+    expect(badPick.breakdown.groupFit).toBeCloseTo(0.55); // 1 - 0.15*3
+    expect(goodPick.score).toBeGreaterThan(badPick.score);
+  });
+
+  test('groupFit returns 0.5 when optimal_min/max are null (neutral)', () => {
+    const candidates: EnrichedGameForRanking[] = [
+      {
+        id: 'no-data',
+        name: 'No Data',
+        steamReviewPctPositive: null,
+        metadataSyncedAt: null,
+        optimalMin: null,
+        optimalMax: null,
+      },
+    ];
+    const result = rankByThumbs({
+      group: { id: 'g1', size: 4 },
+      candidates,
+      thumbs: new Map(),
+      ownership: new Map([['no-data', { ownerCount: 1, maxLastPlayed: null }]]),
+      weights: { thumbs: 0.4, ownership: 0.2, novelty: 0.2, groupFit: 0.2 },
+      now: new Date(),
+    });
+    expect(result.picks[0]!.breakdown.groupFit).toBeCloseTo(0.5);
   });
 });

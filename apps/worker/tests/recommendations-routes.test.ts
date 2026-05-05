@@ -165,4 +165,86 @@ describe('GET /api/groups/:gid/recommendations', () => {
     });
     expect(res.status).toBe(403);
   });
+
+  test('groupFit factor surfaces well-fit games above poor-fit ones', async () => {
+    const now = new Date().toISOString();
+    await db().users.insert({
+      id: 'u_bob',
+      email: 'bob@x',
+      emailVerified: true,
+      displayName: 'Bob',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db().users.insert({
+      id: 'u_carol',
+      email: 'carol@x',
+      emailVerified: true,
+      displayName: 'Carol',
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Add bob and carol to the existing group (alec is already creator/member)
+    await env.DB.prepare(
+      `INSERT INTO group_members (group_id, user_id, role, joined_at, weight) VALUES (?, ?, 'member', ?, 1.0)`,
+    )
+      .bind(groupId, 'u_bob', now)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO group_members (group_id, user_id, role, joined_at, weight) VALUES (?, ?, 'member', ?, 1.0)`,
+    )
+      .bind(groupId, 'u_carol', now)
+      .run();
+
+    // Two games: one optimal for group size 3, one optimal for solo only
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO games (id, name, metadata_synced_at, catalog_tier, has_coop, steam_review_pct_positive, optimal_min, optimal_max)
+              VALUES ('steam-fit', 'FitGame', '2026-01-01', 'auto', 1, 90, 2, 4)`,
+      ),
+      env.DB.prepare(
+        `INSERT INTO games (id, name, metadata_synced_at, catalog_tier, has_coop, steam_review_pct_positive, optimal_min, optimal_max)
+              VALUES ('steam-misfit', 'MisfitGame', '2026-01-01', 'auto', 1, 90, 1, 1)`,
+      ),
+      // All 3 users own both games (tied ownership)
+      env.DB.prepare(
+        `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, added_at) VALUES ('u_alec', 'steam-fit', 'steam', 0, ?)`,
+      ).bind(now),
+      env.DB.prepare(
+        `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, added_at) VALUES ('u_bob', 'steam-fit', 'steam', 0, ?)`,
+      ).bind(now),
+      env.DB.prepare(
+        `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, added_at) VALUES ('u_carol', 'steam-fit', 'steam', 0, ?)`,
+      ).bind(now),
+      env.DB.prepare(
+        `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, added_at) VALUES ('u_alec', 'steam-misfit', 'steam', 0, ?)`,
+      ).bind(now),
+      env.DB.prepare(
+        `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, added_at) VALUES ('u_bob', 'steam-misfit', 'steam', 0, ?)`,
+      ).bind(now),
+      env.DB.prepare(
+        `INSERT INTO game_ownership (user_id, game_id, source, playtime_minutes, added_at) VALUES ('u_carol', 'steam-misfit', 'steam', 0, ?)`,
+      ).bind(now),
+    ]);
+
+    const res = await SELF.fetch(`https://x/api/groups/${groupId}/recommendations`, {
+      headers: { cookie: `wwp_session=${alecSession}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      picks: Array<{ game: { id: string }; score: number; breakdown: { groupFit: number } }>;
+    };
+    const fit = body.picks.find((p) => p.game.id === 'steam-fit')!;
+    const misfit = body.picks.find((p) => p.game.id === 'steam-misfit')!;
+    expect(fit).toBeDefined();
+    expect(misfit).toBeDefined();
+    // Group size 3, optimal [2,4] => inside range => 1.0
+    expect(fit.breakdown.groupFit).toBeCloseTo(1.0);
+    // Group size 3, optimal [1,1] => 2 above max => 1 - 0.15*2 = 0.7
+    expect(misfit.breakdown.groupFit).toBeCloseTo(0.7);
+    expect(fit.score).toBeGreaterThan(misfit.score);
+  });
 });

@@ -232,3 +232,40 @@ export const ThumbVoteRequestV21Schema = z.object({
   vote: z.union([z.literal(-1), z.literal(1)]),
 });
 export type ThumbVoteRequestV21 = z.infer<typeof ThumbVoteRequestV21Schema>;
+
+// === v2.2 additions ===
+
+/** Game shape extended with v2.2 IGDB metadata. NULL fields mean IGDB hasn't enriched this game yet. */
+export interface GameV22 extends GameV21 {
+  description: string | null;
+  genres: string[]; // parsed from JSON column
+  igdbScreenshotId: string | null;
+  optimalMin: number | null;
+  optimalMax: number | null;
+}
+
+/** Per-member ownership context for the game-detail modal. */
+export interface MemberOwnership {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  playtime: number; // minutes
+  lastPlayed: string | null; // ISO timestamp
+}
+
+/** Response shape for GET /api/games/:gameId?groupId=:gid */
+export interface GameDetailResponse {
+  game: GameV22;
+  groupContext: {
+    ownerCount: number;
+    groupSize: number;
+    members: MemberOwnership[];
+    yourVote: -1 | 0 | 1;
+    thumbs: { up: number; down: number };
+    yourPlaytime: number | null;
+    yourLastPlayed: string | null;
+  };
+}
+
+/** Library preset names (themed rows). */
+export type LibraryPreset = 'most-owned' | 'co-op' | 'pvp' | 'recent' | 'hidden-gems';

@@ -453,3 +453,195 @@ describe('syncSteamLibrary — ownership removed count edge cases', () => {
     expect((ownership as { n: number }).n).toBe(250);
   });
 });
+
+describe('syncSteamLibrary — IGDB enrichment integration', () => {
+  beforeEach(async () => {
+    env.IGDB_CLIENT_ID = 'tc';
+    env.IGDB_CLIENT_SECRET = 'ts';
+    env.WWP_FEAT_IGDB = 'true';
+    // seed a fresh IGDB token so getIGDBToken doesn't try to call Twitch.
+    const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    await env.DB.prepare(
+      'INSERT OR REPLACE INTO igdb_token (id, access_token, expires_at, refreshed_at) VALUES (1, ?, ?, ?)',
+    )
+      .bind('tok', future, new Date().toISOString())
+      .run();
+  });
+
+  test('populates description, genres, igdb_screenshot_id, optimal_min/max from IGDB', async () => {
+    const fakeFetch = vi.fn(async (url: string) => {
+      if (url.includes('GetOwnedGames')) {
+        return new Response(
+          JSON.stringify({
+            response: {
+              game_count: 1,
+              games: [{ appid: 730, name: 'CS2', playtime_forever: 0, rtime_last_played: 0 }],
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('appdetails')) {
+        return new Response(
+          JSON.stringify({
+            '730': {
+              success: true,
+              data: {
+                type: 'game',
+                name: 'CS2',
+                header_image: 'https://h/730.jpg',
+                categories: [
+                  { id: 1, description: 'Multi-player' },
+                  { id: 49, description: 'PvP' },
+                ],
+              },
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('appreviews')) {
+        return new Response(
+          JSON.stringify({
+            success: 1,
+            query_summary: {
+              review_score: 9,
+              review_score_desc: 'OP',
+              total_positive: 95,
+              total_reviews: 100,
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('api.igdb.com')) {
+        return new Response(
+          JSON.stringify([
+            {
+              name: 'Counter-Strike 2',
+              summary: 'Tactical shooter.',
+              genres: [{ name: 'Shooter' }],
+              multiplayer_modes: [{ online_max: 10 }],
+              cover: { image_id: 'co1abc' },
+              screenshots: [{ image_id: 'sc1xyz' }],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    await syncSteamLibrary(env, 'u1', '76561198000000001', {
+      fetchImpl: fakeFetch as typeof fetch,
+      enrichmentEnabled: true,
+      enrichmentParallelism: 1,
+    });
+
+    const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?').bind('steam-730').first();
+    expect((game as any).description).toBe('Tactical shooter.');
+    expect(JSON.parse((game as any).genres)).toEqual(['Shooter']);
+    expect((game as any).igdb_screenshot_id).toBe('sc1xyz');
+    expect((game as any).optimal_min).toBe(2); // CS2 is multiplayer-only (no Single-player category) → min = 2
+    expect((game as any).optimal_max).toBe(10);
+  });
+
+  test('skips IGDB when WWP_FEAT_IGDB is "false"', async () => {
+    env.WWP_FEAT_IGDB = 'false';
+    const fakeFetch = vi.fn(async (url: string) => {
+      if (url.includes('GetOwnedGames')) {
+        return new Response(
+          JSON.stringify({
+            response: {
+              game_count: 1,
+              games: [{ appid: 730, name: 'CS2', playtime_forever: 0, rtime_last_played: 0 }],
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('appdetails')) {
+        return new Response(
+          JSON.stringify({
+            '730': {
+              success: true,
+              data: { type: 'game', name: 'CS2', header_image: '', categories: [] },
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('appreviews')) {
+        return new Response(
+          JSON.stringify({
+            success: 1,
+            query_summary: { review_score: 0, total_positive: 0, total_reviews: 0 },
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response('{}', { status: 200 });
+    });
+    await syncSteamLibrary(env, 'u1', '76561198000000001', {
+      fetchImpl: fakeFetch as typeof fetch,
+      enrichmentEnabled: true,
+    });
+    const igdbCalls = fakeFetch.mock.calls.filter((c) => (c[0] as string).includes('api.igdb.com'));
+    expect(igdbCalls.length).toBe(0);
+    const game = await env.DB.prepare('SELECT description FROM games WHERE id = ?')
+      .bind('steam-730')
+      .first();
+    expect((game as any).description).toBeNull();
+  });
+
+  test('graceful when IGDB returns nothing for the game (Steam fields still populate)', async () => {
+    const fakeFetch = vi.fn(async (url: string) => {
+      if (url.includes('GetOwnedGames')) {
+        return new Response(
+          JSON.stringify({
+            response: {
+              game_count: 1,
+              games: [{ appid: 99999, name: 'Obscure', playtime_forever: 0, rtime_last_played: 0 }],
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('appdetails')) {
+        return new Response(
+          JSON.stringify({
+            '99999': {
+              success: true,
+              data: {
+                type: 'game',
+                name: 'Obscure',
+                header_image: 'h.jpg',
+                categories: [{ id: 2, description: 'Single-player' }],
+              },
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('appreviews')) {
+        return new Response('error', { status: 500 });
+      }
+      if (url.includes('api.igdb.com')) {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    await syncSteamLibrary(env, 'u1', '76561198000000001', {
+      fetchImpl: fakeFetch as typeof fetch,
+      enrichmentEnabled: true,
+    });
+    const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?')
+      .bind('steam-99999')
+      .first();
+    expect((game as any).name).toBe('Obscure');
+    expect((game as any).has_singleplayer).toBe(1);
+    expect((game as any).description).toBeNull();
+    expect((game as any).igdb_screenshot_id).toBeNull();
+    expect((game as any).metadata_synced_at).not.toBe('');
+  });
+});

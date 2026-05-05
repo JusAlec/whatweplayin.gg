@@ -10,6 +10,7 @@ import { dispatchState } from './routes/state.js';
 import { dispatchThumbs } from './routes/thumbs.js';
 import { dispatchLibrary } from './routes/library.js';
 import { dispatchRecommendations } from './routes/recommendations.js';
+import { dispatchGames } from './routes/games.js';
 import { checkAuth as checkGroupSecret } from './auth.js';
 
 export interface Env {
@@ -38,6 +39,13 @@ export interface Env {
   WWP_RECOMMENDATIONS_LIMIT?: string;
   WWP_THUMBS_DOWN_VETO_DAYS?: string;
   WWP_ENRICHMENT_MAX_PER_RUN?: string;
+
+  // v2.2 behavior toggles
+  WWP_FEAT_IGDB?: string;
+
+  // v2.2 tunables
+  WWP_WEIGHT_GROUPFIT?: string;
+  WWP_HIDDEN_GEMS_PLAYTIME_THRESHOLD?: string;
 }
 
 export default {
@@ -80,6 +88,8 @@ export default {
         parts: apiParts,
       });
       if (recommendationsResp) return withCors(recommendationsResp, request, env);
+      const gamesResp = await dispatchGames({ request, env, parts: apiParts });
+      if (gamesResp) return withCors(gamesResp, request, env);
       return withCors(new Response('not found', { status: 404 }), request, env);
     }
 

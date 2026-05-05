@@ -84,9 +84,11 @@ jobs:
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+          IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
+          IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
         run: |
           set -euo pipefail
-          for SECRET_NAME in BETTER_AUTH_SECRET RESEND_API_KEY STEAM_API_KEY; do
+          for SECRET_NAME in BETTER_AUTH_SECRET RESEND_API_KEY STEAM_API_KEY IGDB_CLIENT_ID IGDB_CLIENT_SECRET; do
             VALUE="${!SECRET_NAME:-}"
             if [ -z "$VALUE" ]; then
               echo "::warning::GitHub secret $SECRET_NAME is unset; skipping"

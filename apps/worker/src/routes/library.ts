@@ -1,4 +1,5 @@
 import { getSessionFromRequest } from '../auth/session-helpers.js';
+import { readNumber } from '../lib/flags.js';
 import type { Env } from '../index.js';
 
 interface RouteCtx {
@@ -30,10 +31,44 @@ export async function dispatchLibrary(ctx: RouteCtx): Promise<Response | null> {
   const sort = url.searchParams.get('sort') ?? 'name';
   const q = url.searchParams.get('q') ?? '';
 
+  // v2.2: ?preset= maps to a combination of filter + sort + extra WHERE clauses.
+  const preset = url.searchParams.get('preset');
+  let presetFilter: string | null = null;
+  let presetSort: string | null = null;
+  let presetExtraWhere: string | null = null;
+  let presetExtraBinds: unknown[] = [];
+
+  if (preset) {
+    const playtimeThreshold = readNumber(env, 'WWP_HIDDEN_GEMS_PLAYTIME_THRESHOLD', 600);
+    if (preset === 'most-owned') {
+      presetSort = 'ownerCount DESC, g.name ASC';
+    } else if (preset === 'co-op') {
+      presetFilter = 'coop';
+      presetSort = 'ownerCount DESC, g.name ASC';
+    } else if (preset === 'pvp') {
+      presetFilter = 'pvp';
+      presetSort = 'ownerCount DESC, g.name ASC';
+    } else if (preset === 'recent') {
+      presetSort = 'maxLastPlayed DESC';
+    } else if (preset === 'hidden-gems') {
+      // Aggregate playtime per game across the group; low total + high reviews.
+      presetExtraWhere = `AND g.steam_review_pct_positive >= 75 AND (
+        SELECT COALESCE(SUM(go3.playtime_minutes), 0)
+          FROM game_ownership go3
+          JOIN group_members gm3 ON gm3.user_id = go3.user_id
+         WHERE go3.game_id = g.id AND gm3.group_id = ?
+      ) <= ?`;
+      presetExtraBinds = [gid, playtimeThreshold];
+      presetSort = 'g.steam_review_pct_positive DESC';
+    }
+  }
+
+  const effectiveFilter = presetFilter ?? filter;
+
   const filterClauses: string[] = [];
-  if (filter === 'coop') filterClauses.push('g.has_coop = 1');
-  else if (filter === 'pvp') filterClauses.push('g.has_pvp = 1');
-  else if (filter === 'single') filterClauses.push('g.has_singleplayer = 1');
+  if (effectiveFilter === 'coop') filterClauses.push('g.has_coop = 1');
+  else if (effectiveFilter === 'pvp') filterClauses.push('g.has_pvp = 1');
+  else if (effectiveFilter === 'single') filterClauses.push('g.has_singleplayer = 1');
 
   const sortMap: Record<string, string> = {
     name: 'g.name ASC',
@@ -41,13 +76,17 @@ export async function dispatchLibrary(ctx: RouteCtx): Promise<Response | null> {
     playtime: 'totalPlaytime DESC',
     owners: 'ownerCount DESC',
   };
-  const sortClause = sortMap[sort] ?? sortMap.name;
+  const sortClause = presetSort ?? sortMap[sort] ?? sortMap.name;
 
   const searchClause = q ? `AND LOWER(g.name) LIKE ?` : '';
   const whereExtras = filterClauses.length > 0 ? `AND ${filterClauses.join(' AND ')}` : '';
+  const extraWhereClause = presetExtraWhere ?? '';
 
+  // totalBinds: gid, [whereExtras args — none currently], [searchClause arg], [presetExtraBinds]
   const totalBinds: unknown[] = [gid];
   if (q) totalBinds.push(`%${q.toLowerCase()}%`);
+  totalBinds.push(...presetExtraBinds);
+
   const totalRow = (await env.DB.prepare(
     `SELECT COUNT(DISTINCT g.id) AS n
        FROM games g
@@ -55,12 +94,18 @@ export async function dispatchLibrary(ctx: RouteCtx): Promise<Response | null> {
        JOIN group_members  gm ON gm.user_id = go.user_id
       WHERE gm.group_id = ?
         ${whereExtras}
-        ${searchClause}`,
+        ${searchClause}
+        ${extraWhereClause}`,
   )
     .bind(...totalBinds)
     .first()) as { n: number };
   const total = totalRow?.n ?? 0;
 
+  // queryBinds order matches the SELECT positions:
+  //   yourPlaytime (go2 user check), yourLastPlayed (go2 user check),
+  //   gid (yourVote subquery), session.user.id (yourVote subquery),
+  //   gid (thumbsUp subquery), gid (thumbsDown subquery),
+  //   gid (main WHERE), [searchClause arg], [presetExtraBinds], limit, offset
   const queryBinds: unknown[] = [
     session.user.id, // yourPlaytime
     session.user.id, // yourLastPlayed
@@ -71,6 +116,7 @@ export async function dispatchLibrary(ctx: RouteCtx): Promise<Response | null> {
     gid, // main where
   ];
   if (q) queryBinds.push(`%${q.toLowerCase()}%`);
+  queryBinds.push(...presetExtraBinds);
   queryBinds.push(limit, offset);
 
   const result = await env.DB.prepare(
@@ -91,6 +137,7 @@ export async function dispatchLibrary(ctx: RouteCtx): Promise<Response | null> {
       WHERE gm.group_id = ?
         ${whereExtras}
         ${searchClause}
+        ${extraWhereClause}
       GROUP BY g.id
       ORDER BY ${sortClause}
       LIMIT ? OFFSET ?`,

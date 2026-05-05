@@ -14,7 +14,7 @@ import { readNumber } from './flags.js';
 export interface SyncOptions {
   fetchImpl?: typeof fetch;
   enrichmentEnabled?: boolean; // default true
-  enrichmentParallelism?: number; // default 6
+  enrichmentParallelism?: number; // default 3
 }
 
 export interface SyncResult {
@@ -132,7 +132,7 @@ export async function enrichUserGames(
   opts: SyncOptions = {},
 ): Promise<{ enriched: number; unenrichedRemaining: number }> {
   const fetchImpl = opts.fetchImpl ?? fetch;
-  const parallelism = opts.enrichmentParallelism ?? 6;
+  const parallelism = opts.enrichmentParallelism ?? 3; // was 6 in v2.1; dropped for IGDB rate limit (4/sec)
   const maxPerRun = readNumber(env, 'WWP_ENRICHMENT_MAX_PER_RUN', 20);
 
   // Find un-enriched games owned by this user.
@@ -213,7 +213,7 @@ async function enrichNewGames(
   opts: SyncOptions,
 ): Promise<number> {
   const fetchImpl = opts.fetchImpl ?? fetch;
-  const parallelism = opts.enrichmentParallelism ?? 6;
+  const parallelism = opts.enrichmentParallelism ?? 3; // was 6 in v2.1; dropped for IGDB rate limit (4/sec)
   // Cloudflare Workers free tier caps subrequests per invocation at 50.
   // Each enrichment costs 2 HTTP calls (appdetails + appreviews); GetOwnedGames
   // is one more, plus a small headroom. 20 enrichments × 2 + 1 = 41 < 50.
@@ -256,7 +256,6 @@ async function enrichOne(
 ): Promise<void> {
   const details = await fetchAppDetails(appid, fetchImpl);
   if (!details) {
-    // Non-game (DLC, soundtrack) or failed lookup. Cache for 24h.
     markAppidSkipped(appid);
     return;
   }
@@ -268,26 +267,59 @@ async function enrichOne(
     reviews = null;
   }
 
+  // v2.2: layer IGDB on top, gated by WWP_FEAT_IGDB.
+  let igdbDescription: string | null = null;
+  let igdbGenres: string[] = [];
+  let igdbScreenshotId: string | null = null;
+  let optimalMin: number | null = null;
+  let optimalMax: number | null = null;
+
+  if (env.WWP_FEAT_IGDB === 'true') {
+    try {
+      const { fetchIGDBGameByAppId } = await import('./igdb-api.js');
+      const igdb = await fetchIGDBGameByAppId(env, appid, fetchImpl);
+      if (igdb) {
+        igdbDescription = igdb.summary ?? null;
+        igdbGenres = (igdb.genres ?? []).map((g) => g.name);
+        // Prefer the first screenshot; fall back to cover for the hero backdrop.
+        igdbScreenshotId = igdb.screenshots?.[0]?.image_id ?? igdb.cover?.image_id ?? null;
+        const optimal = deriveOptimalPlayerCount(
+          igdb.multiplayer_modes ?? [],
+          details.hasSinglePlayer,
+        );
+        optimalMin = optimal.min;
+        optimalMax = optimal.max;
+      }
+    } catch (err) {
+      console.error('IGDB enrichment failed for', appid, err);
+    }
+  }
+
   const now = new Date().toISOString();
   const minPlayers = 1;
   const maxPlayers = details.hasCoop || details.hasPvp ? 8 : 1;
 
   await env.DB.prepare(
     `UPDATE games
-          SET name = ?,
-              cover_url = ?,
-              has_singleplayer = ?,
-              has_coop = ?,
-              has_pvp = ?,
-              min_players = ?,
-              max_players = ?,
-              release_date = ?,
-              metadata_synced_at = ?,
-              steam_review_score = ?,
-              steam_review_score_desc = ?,
-              steam_review_pct_positive = ?,
-              steam_review_count = ?
-        WHERE id = ?`,
+        SET name = ?,
+            cover_url = ?,
+            has_singleplayer = ?,
+            has_coop = ?,
+            has_pvp = ?,
+            min_players = ?,
+            max_players = ?,
+            optimal_min = ?,
+            optimal_max = ?,
+            release_date = ?,
+            metadata_synced_at = ?,
+            steam_review_score = ?,
+            steam_review_score_desc = ?,
+            steam_review_pct_positive = ?,
+            steam_review_count = ?,
+            description = ?,
+            genres = ?,
+            igdb_screenshot_id = ?
+      WHERE id = ?`,
   )
     .bind(
       details.name,
@@ -297,13 +329,34 @@ async function enrichOne(
       details.hasPvp ? 1 : 0,
       minPlayers,
       maxPlayers,
+      optimalMin,
+      optimalMax,
       details.releaseDate,
       now,
       reviews?.score ?? null,
       reviews?.scoreDesc ?? null,
       reviews?.pctPositive ?? null,
       reviews?.count ?? null,
+      igdbDescription,
+      JSON.stringify(igdbGenres),
+      igdbScreenshotId,
       gameId,
     )
     .run();
+}
+
+function deriveOptimalPlayerCount(
+  modes: Array<{ online_max?: number; online_coop_max?: number; lan_max?: number }>,
+  hasSinglePlayer: boolean,
+): { min: number | null; max: number | null } {
+  if (!modes || modes.length === 0) {
+    return { min: null, max: null };
+  }
+  let max = 0;
+  for (const mode of modes) {
+    max = Math.max(max, mode.online_max ?? 0, mode.online_coop_max ?? 0, mode.lan_max ?? 0);
+  }
+  if (max === 0) return { min: null, max: null };
+  const min = hasSinglePlayer ? 1 : 2;
+  return { min, max };
 }

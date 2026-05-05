@@ -30,9 +30,10 @@ export async function dispatchRecommendations(ctx: RouteCtx): Promise<Response |
   if (!memberRow) return jsonStatus({ error: 'forbidden' }, 403);
 
   const weights = {
-    thumbs: readNumber(env, 'WWP_WEIGHT_THUMBS', 0.5),
-    ownership: readNumber(env, 'WWP_WEIGHT_OWNERSHIP', 0.3),
+    thumbs: readNumber(env, 'WWP_WEIGHT_THUMBS', 0.4),
+    ownership: readNumber(env, 'WWP_WEIGHT_OWNERSHIP', 0.2),
     novelty: readNumber(env, 'WWP_WEIGHT_NOVELTY', 0.2),
+    groupFit: readNumber(env, 'WWP_WEIGHT_GROUPFIT', 0.2),
   };
   const limit = readNumber(env, 'WWP_RECOMMENDATIONS_LIMIT', 5);
   const vetoDays = readNumber(env, 'WWP_THUMBS_DOWN_VETO_DAYS', 7);
@@ -66,6 +67,8 @@ export async function dispatchRecommendations(ctx: RouteCtx): Promise<Response |
     name: r.name as string,
     steamReviewPctPositive: (r.steam_review_pct_positive as number | null) ?? null,
     metadataSyncedAt: (r.metadata_synced_at as string | null) ?? null,
+    optimalMin: (r.optimal_min as number | null) ?? null,
+    optimalMax: (r.optimal_max as number | null) ?? null,
   }));
 
   if (candidates.length === 0) {
